@@ -21,9 +21,6 @@ SPOTIFY_REDIRECT_URI = os.getenv(
     "SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback"
 )
 
-# OpenAI (optional – not used anymore in the current script)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
 # Spotify API constants
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
