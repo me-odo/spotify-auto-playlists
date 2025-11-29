@@ -174,63 +174,6 @@ def get_all_liked_tracks(token_info: Dict) -> List[Track]:
     return tracks
 
 
-def get_audio_features(token_info: Dict, track_ids: List[str]) -> Dict[str, Dict]:
-    """
-    Fetch /audio-features in batches of 100 IDs.
-    If Spotify returns an error (403, etc.), we log and continue without features.
-    """
-    print("Fetching audio features from Spotify...")
-    headers = spotify_headers(token_info)
-    features_by_id: Dict[str, Dict] = {}
-
-    if not track_ids:
-        print("No track IDs provided for audio features.")
-        return features_by_id
-
-    total_batches = (len(track_ids) + 99) // 100
-
-    for batch_index in range(total_batches):
-        start = batch_index * 100
-        end = start + 100
-        batch = track_ids[start:end]
-        ids_param = ",".join(batch)
-        url = f"{SPOTIFY_API_BASE}/audio-features"
-        r = requests.get(url, headers=headers, params={"ids": ids_param})
-
-        if r.status_code == 403:
-            print("⚠ Spotify returned 403 Forbidden on /audio-features.")
-            try:
-                print("Spotify response:", r.text)
-            except Exception:
-                pass
-            print(
-                "Continuing without audio features. Classification will use only title/artist/album."
-            )
-            return {}
-
-        if not r.ok:
-            print(
-                f"⚠ Error calling /audio-features (status {r.status_code}). Batch ignored."
-            )
-            try:
-                print("Spotify response:", r.text)
-            except Exception:
-                pass
-            continue
-
-        data = r.json()
-        for f in data.get("audio_features", []):
-            if f and f.get("id"):
-                features_by_id[f["id"]] = f
-
-        print_progress_bar(
-            batch_index + 1, total_batches, prefix="  Audio features batches"
-        )
-
-    print(f"\n→ Audio features fetched for {len(features_by_id)} tracks.")
-    return features_by_id
-
-
 def get_user_playlists(token_info: Dict) -> List[Dict]:
     print("Fetching existing playlists from Spotify...")
     playlists = []

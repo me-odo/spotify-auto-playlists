@@ -30,7 +30,6 @@ def save_classification_cache(cache: Dict[str, Dict]) -> None:
 
 def classify_tracks(
     tracks: List[Track],
-    features_by_id: Dict[str, Dict],
     refresh_existing: bool = False,
 ) -> Dict[str, Classification]:
     """
@@ -43,10 +42,6 @@ def classify_tracks(
     if refresh_existing:
         print("↻ Refreshing classification cache (simple 'all' mode).")
         cache = {}
-
-    # We don't use features yet, but we store them on the track object for future use
-    for t in tracks:
-        t.features = features_by_id.get(t.id, {})
 
     classifications: Dict[str, Classification] = {}
 

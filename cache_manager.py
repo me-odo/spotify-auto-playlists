@@ -1,22 +1,16 @@
 import json
 import os
 from dataclasses import asdict
-from typing import Dict, List, Tuple
+from typing import List
 
-from config import TRACKS_CACHE_FILE, FEATURES_CACHE_FILE
+from config import TRACKS_CACHE_FILE
 from models import Track
-from spotify_client import get_audio_features
 
 
 def _ensure_dir(path: str) -> None:
     directory = os.path.dirname(path)
     if directory and not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
-
-
-# -------------------------
-# 1) Track cache
-# -------------------------
 
 
 def load_tracks_cache() -> List[Track]:
@@ -32,78 +26,3 @@ def save_tracks_cache(tracks: List[Track]) -> None:
     data = [asdict(t) for t in tracks]
     with open(TRACKS_CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-# -------------------------
-# 2) Audio features cache
-# -------------------------
-
-
-def load_features_cache() -> Dict[str, Dict]:
-    if not os.path.exists(FEATURES_CACHE_FILE):
-        return {}
-    with open(FEATURES_CACHE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_features_cache(features: Dict[str, Dict]) -> None:
-    _ensure_dir(FEATURES_CACHE_FILE)
-    with open(FEATURES_CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(features, f, ensure_ascii=False, indent=2)
-
-
-def get_features_for_tracks_with_cache(
-    token_info: Dict,
-    tracks: List[Track],
-    tracks_refreshed: bool,
-) -> Dict[str, Dict]:
-    """
-    - Load the audio-features cache.
-    - If tracks have NOT been refreshed and a cache exists:
-        → reuse the cache as-is (no new Spotify call).
-    - If tracks HAVE been refreshed:
-        → either fully refresh or only fetch missing IDs.
-    """
-    existing_features = load_features_cache()
-    track_ids = [t.id for t in tracks if t.id]
-
-    if not existing_features:
-        # No cache → we must fetch features from Spotify
-        print("No audio features cache found. Fetching audio features from Spotify...")
-        new_features = get_audio_features(token_info, track_ids)
-        save_features_cache(new_features)
-        return new_features
-
-    if not tracks_refreshed:
-        # Tracks not refreshed + existing cache → reuse as-is
-        print(
-            f"Found {len(existing_features)} audio features locally. "
-            "Tracks cache not refreshed, reusing existing features."
-        )
-        return existing_features
-
-    # Here: tracks were refreshed AND we already have a features cache
-    print(f"Found {len(existing_features)} audio features locally.")
-    answer = (
-        input("Do you want to refresh audio features for all tracks? [Y/n] ")
-        .strip()
-        .lower()
-    )
-
-    if answer in ("n", "no"):
-        print("→ Keeping existing audio features; fetching only missing ones.")
-        missing_ids = [tid for tid in track_ids if tid not in existing_features]
-        if missing_ids:
-            print(f"Fetching audio features for {len(missing_ids)} missing tracks...")
-            extra = get_audio_features(token_info, missing_ids)
-            merged = {**existing_features, **extra}
-        else:
-            merged = existing_features
-        save_features_cache(merged)
-        return merged
-
-    # Full refresh
-    print("→ Refreshing audio features for all tracks.")
-    new_features = get_audio_features(token_info, track_ids)
-    save_features_cache(new_features)
-    return new_features
