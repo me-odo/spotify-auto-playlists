@@ -1,12 +1,16 @@
+from collections import Counter
 import json
 import os
-import time
-import webbrowser
-from typing import Dict, List
-from collections import Counter
-
 import requests
+import time
+from typing import Dict, List
+import webbrowser
 
+from cli_utils import (
+    print_step,
+    print_info,
+    print_progress_bar,
+)
 from config import (
     SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET,
@@ -17,7 +21,6 @@ from config import (
     SCOPES,
 )
 from models import Track
-from cli_utils import print_progress_bar
 
 
 def get_spotify_token() -> Dict:
@@ -36,14 +39,16 @@ def get_spotify_token() -> Dict:
     }
     url_args = urlencode(auth_query_parameters)
     auth_url = f"{SPOTIFY_AUTH_URL}/?{url_args}"
-    print("Open the following URL in a browser and authorize the application:")
-    print(auth_url)
+    print_step("Open the following URL in a browser and authorize the application:")
+    print_info(auth_url)
     try:
         webbrowser.open(auth_url)
     except Exception:
         pass
 
-    auth_code = input("Paste the 'code' parameter from the redirect URL here: ").strip()
+    auth_code = input(
+        "→ Paste the 'code' parameter from the redirect URL here: "
+    ).strip()
 
     token_data = {
         "grant_type": "authorization_code",
@@ -104,53 +109,22 @@ def get_current_user_id(token_info: Dict) -> str:
 
 
 def get_all_liked_tracks(token_info: Dict) -> List[Track]:
-    print("Fetching liked tracks from Spotify...")
-
-    headers = spotify_headers(token_info)
-    limit = 50
-    url = f"{SPOTIFY_API_BASE}/me/tracks"
-    params = {"limit": limit}
-
+    print_step("Fetching liked tracks from Spotify...")
     tracks: List[Track] = []
+    url = f"{SPOTIFY_API_BASE}/me/tracks"
+    params = {"limit": 50}
+    headers = spotify_headers(token_info)
 
-    # --- First request: to get TOTAL count ---
-    r = requests.get(url, headers=headers, params=params)
-    r.raise_for_status()
-    data = r.json()
+    page = 0
+    total = None
 
-    total = data.get("total", 0)
-    if total == 0:
-        print("→ No liked tracks found.")
-        return []
-
-    total_pages = (total + limit - 1) // limit  # ceil(total / limit)
-
-    # Process first page immediately
-    items = data.get("items", [])
-    for item in items:
-        t = item["track"]
-        tracks.append(
-            Track(
-                id=t["id"],
-                name=t["name"],
-                artist=", ".join(a["name"] for a in t["artists"]),
-                album=t["album"]["name"],
-                release_date=t["album"].get("release_date"),
-                added_at=item.get("added_at"),
-                features={},
-            )
-        )
-
-    print_progress_bar(1, total_pages, prefix="  Fetching pages")
-    next_url = data.get("next")
-
-    # --- Loop on remaining pages ---
-    current_page = 1
-    while next_url:
-        current_page += 1
-        r = requests.get(next_url, headers=headers)
+    while url:
+        page += 1
+        r = requests.get(url, headers=headers, params=params)
         r.raise_for_status()
         data = r.json()
+        if total is None:
+            total = data.get("total", 0)
 
         items = data.get("items", [])
         for item in items:
@@ -166,16 +140,18 @@ def get_all_liked_tracks(token_info: Dict) -> List[Track]:
                     features={},
                 )
             )
+        url = data.get("next")
+        params = None  # next URL already includes params
 
-        print_progress_bar(current_page, total_pages, prefix="  Fetching pages")
-        next_url = data.get("next")
+        if total:
+            estimated_pages = (total + 49) // 50
+            print_progress_bar(page, estimated_pages, prefix="  Fetching pages")
 
-    print(f"\n→ {len(tracks)} liked tracks fetched.")
+    print_info(f"{len(tracks)} liked tracks fetched.")
     return tracks
 
 
 def get_user_playlists(token_info: Dict) -> List[Dict]:
-    print("Fetching existing playlists from Spotify...")
     playlists = []
     url = f"{SPOTIFY_API_BASE}/me/playlists"
     headers = spotify_headers(token_info)
@@ -186,10 +162,10 @@ def get_user_playlists(token_info: Dict) -> List[Dict]:
         r.raise_for_status()
         data = r.json()
         playlists.extend(data["items"])
-        url = data["next"]
-        params = None  # next URL already includes params
+        url = data.get("next")
+        params = None
 
-    print(f"→ {len(playlists)} playlists found.")
+    print_info(f"{len(playlists)} playlists found.")
     return playlists
 
 

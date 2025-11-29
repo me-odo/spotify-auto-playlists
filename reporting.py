@@ -1,12 +1,9 @@
 import os
 from typing import List
+
 from config import REPORTS_DIR
+from fs_utils import ensure_dir
 from models import Track
-
-
-def _ensure_dir(directory: str) -> None:
-    if not os.path.exists(directory):
-        os.makedirs(directory, exist_ok=True)
 
 
 def write_unmatched_report(unmatched_tracks: List[Track], filename: str) -> str:
@@ -16,7 +13,7 @@ def write_unmatched_report(unmatched_tracks: List[Track], filename: str) -> str:
     Returns the full path of the report file.
     """
     # Make sure the reports directory exists
-    _ensure_dir(REPORTS_DIR)
+    ensure_dir(REPORTS_DIR)
 
     path = os.path.join(REPORTS_DIR, filename)
 

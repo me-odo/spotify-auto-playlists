@@ -1,43 +1,64 @@
+# cli_utils.py
 import sys
-import time
+
+
+def print_header(title: str) -> None:
+    """Top-level section header."""
+    print(f"\n=== {title} ===")
+
+
+def print_info(message: str) -> None:
+    """Neutral information (no icon, just slight indent)."""
+    print(f"{message}")
+
+
+def print_step(message: str) -> None:
+    """Action step / ongoing work."""
+    print(f"→ {message}")
+
+
+def print_success(message: str) -> None:
+    """Successful outcome."""
+    print(f"✅ {message}")
+
+
+def print_warning(message: str) -> None:
+    """Warning / non-fatal problem."""
+    print(f"⚠️  {message}")
+
+
+def print_error(message: str) -> None:
+    """Error / fatal problem."""
+    print(f"❌ {message}")
+
+
+def print_question(message: str) -> None:
+    """Prompt for user input."""
+    # Just a visual convention; you still call input() yourself
+    print(f"?  {message}", end="")
 
 
 def print_progress_bar(
-    current: int, total: int, prefix: str = "", length: int = 30
+    current: int,
+    total: int,
+    prefix: str = "",
+    length: int = 30,
 ) -> None:
     """
-    Simple textual progress bar.
+    Simple progress bar in the terminal.
+
     Example:
-    [##########----------] 33.3%
+      print_progress_bar(10, 100, prefix="  Fetching")
     """
     if total <= 0:
-        sys.stdout.write(f"\r{prefix} ...")
-        sys.stdout.flush()
-        return
-
-    ratio = current / total
-    percent = ratio * 100
-    filled_len = int(length * ratio)
-    bar = "#" * filled_len + "-" * (length - filled_len)
-    sys.stdout.write(f"\r{prefix} [{bar}] {percent:5.1f}%")
+        total = 1
+    fraction = max(0.0, min(1.0, current / total))
+    filled_length = int(length * fraction)
+    bar = "#" * filled_length + "-" * (length - filled_length)
+    percent = fraction * 100
+    line = f"\r{prefix} [{bar}] {percent:5.1f}%"
+    sys.stdout.write(line)
     sys.stdout.flush()
     if current >= total:
         sys.stdout.write("\n")
         sys.stdout.flush()
-
-
-def spinner(message: str, duration: float = 0.1):
-    """
-    Very simple spinner generator. Use in loops:
-
-        spin = spinner("Working")
-        next(spin)  # update
-    """
-    symbols = ["|", "/", "-", "\\"]
-    index = 0
-    while True:
-        sys.stdout.write(f"\r{message} {symbols[index]}")
-        sys.stdout.flush()
-        time.sleep(duration)
-        index = (index + 1) % len(symbols)
-        yield

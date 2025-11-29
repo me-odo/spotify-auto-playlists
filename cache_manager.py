@@ -1,16 +1,11 @@
+from dataclasses import asdict
 import json
 import os
-from dataclasses import asdict
 from typing import List
 
 from config import TRACKS_CACHE_FILE
+from fs_utils import ensure_parent_dir
 from models import Track
-
-
-def _ensure_dir(path: str) -> None:
-    directory = os.path.dirname(path)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory, exist_ok=True)
 
 
 def load_tracks_cache() -> List[Track]:
@@ -22,7 +17,7 @@ def load_tracks_cache() -> List[Track]:
 
 
 def save_tracks_cache(tracks: List[Track]) -> None:
-    _ensure_dir(TRACKS_CACHE_FILE)
+    ensure_parent_dir(TRACKS_CACHE_FILE)
     data = [asdict(t) for t in tracks]
     with open(TRACKS_CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)

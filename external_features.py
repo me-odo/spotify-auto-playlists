@@ -1,17 +1,21 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
+import requests
 from typing import Dict, List, Tuple, Optional
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-import requests
-
+from cli_utils import (
+    print_step,
+    print_info,
+    print_warning,
+    print_progress_bar,
+)
 from config import (
     EXTERNAL_FEATURES_CACHE_FILE,
     MUSICBRAINZ_USER_AGENT,
 )
+from fs_utils import ensure_parent_dir
 from models import Track
-from cli_utils import print_progress_bar
 
 
 MUSICBRAINZ_API_BASE = "https://musicbrainz.org/ws/2"
@@ -23,17 +27,6 @@ MB_HEADERS = {
 }
 
 
-def _ensure_dir(path: str) -> None:
-    directory = os.path.dirname(path)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory, exist_ok=True)
-
-
-# -------------------------
-# Cache handling
-# -------------------------
-
-
 def load_external_features_cache() -> Dict[str, Dict]:
     if not os.path.exists(EXTERNAL_FEATURES_CACHE_FILE):
         return {}
@@ -42,14 +35,9 @@ def load_external_features_cache() -> Dict[str, Dict]:
 
 
 def save_external_features_cache(cache: Dict[str, Dict]) -> None:
-    _ensure_dir(EXTERNAL_FEATURES_CACHE_FILE)
+    ensure_parent_dir(EXTERNAL_FEATURES_CACHE_FILE)
     with open(EXTERNAL_FEATURES_CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(cache, f, ensure_ascii=False, indent=2)
-
-
-# -------------------------
-# MusicBrainz + AcousticBrainz
-# -------------------------
 
 
 def _search_musicbrainz_recording(track: Track) -> Optional[str]:
@@ -148,12 +136,13 @@ def enrich_tracks_with_external_features(
       - shared state (cache, external_features) is only modified from the main thread,
         based on worker results → no concurrent writes, no race conditions.
     """
-    print("Fetching external mood/genre features (MusicBrainz + AcousticBrainz)...")
+    print_step(
+        "Fetching external mood/genre features (MusicBrainz + AcousticBrainz)..."
+    )
 
     # Load existing cache from disk
     cache = load_external_features_cache()
     external_features: Dict[str, Dict] = {}
-    unmatched: List[Track] = []
 
     # Start by using everything we already have in cache (unless we truly want full refresh)
     if not force_refresh:
@@ -170,17 +159,15 @@ def enrich_tracks_with_external_features(
     total_to_process = len(to_process)
 
     if total_to_process == 0:
-        print(
-            f"→ Using existing external features cache; "
+        print_info(
+            f"Using existing external features cache; "
             f"{len(external_features)} tracks already have external data."
         )
-        # Mark as unmatched any track that still has no external data
-        for t in tracks:
-            if t.id not in external_features:
-                unmatched.append(t)
+        # Tracks that still have no external data are unmatched
+        unmatched = [t for t in tracks if t.id not in external_features]
         return external_features, unmatched
 
-    print(f"  {total_to_process} tracks to resolve externally.")
+    print_info(f"{total_to_process} tracks to resolve externally.")
 
     # Parallel execution: only network calls happen in threads.
     # Cache updates happen in the main thread.
@@ -212,16 +199,14 @@ def enrich_tracks_with_external_features(
             # Save cache to disk incrementally so we don't lose progress
             save_external_features_cache(cache)
 
-    # Final log
-    print(
-        f"\n→ External features available for {len(external_features)} tracks "
-        f"(newly fetched: {total_to_process - (total_to_process - processed)}; "
-        f"tracks processed: {processed})."
-    )
+    # Final log: build unmatched list (tracks with no external data at all)
+    unmatched: List[Track] = [t for t in tracks if t.id not in external_features]
 
-    # Ensure unmatched includes all tracks with no external data at all
-    for t in tracks:
-        if t.id not in external_features:
-            unmatched.append(t)
+    print_info(
+        f"External features available for {len(external_features)} tracks "
+        f"(tracks processed: {total_to_process})."
+    )
+    if unmatched:
+        print_warning(f"External features missing for {len(unmatched)} tracks.")
 
     return external_features, unmatched
