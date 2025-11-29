@@ -15,7 +15,7 @@ def _ensure_dir(path: str) -> None:
 
 
 # -------------------------
-# 1) Cache des tracks
+# 1) Track cache
 # -------------------------
 
 
@@ -35,7 +35,7 @@ def save_tracks_cache(tracks: List[Track]) -> None:
 
 
 # -------------------------
-# 2) Cache des audio features
+# 2) Audio features cache
 # -------------------------
 
 
@@ -58,31 +58,31 @@ def get_features_for_tracks_with_cache(
     tracks_refreshed: bool,
 ) -> Dict[str, Dict]:
     """
-    - Charge le cache des audio features.
-    - Si les tracks n'ont PAS été rafraîchies et qu'un cache existe :
-        → on réutilise le cache tel quel (pas de nouvel appel Spotify).
-    - Si les tracks ont été rafraîchies :
-        → on peut rafraîchir complètement ou compléter seulement les IDs manquants.
+    - Load the audio-features cache.
+    - If tracks have NOT been refreshed and a cache exists:
+        → reuse the cache as-is (no new Spotify call).
+    - If tracks HAVE been refreshed:
+        → either fully refresh or only fetch missing IDs.
     """
     existing_features = load_features_cache()
     track_ids = [t.id for t in tracks if t.id]
 
     if not existing_features:
-        # Pas de cache → on doit aller chercher les features
-        print("No audio features cache found. Fetching audio features from Spotify…")
+        # No cache → we must fetch features from Spotify
+        print("No audio features cache found. Fetching audio features from Spotify...")
         new_features = get_audio_features(token_info, track_ids)
         save_features_cache(new_features)
         return new_features
 
     if not tracks_refreshed:
-        # Tracks pas rafraîchies + cache existant -> on réutilise tel quel
+        # Tracks not refreshed + existing cache → reuse as-is
         print(
             f"Found {len(existing_features)} audio features locally. "
-            "Tracks cache not refreshed, so we reuse them."
+            "Tracks cache not refreshed, reusing existing features."
         )
         return existing_features
 
-    # Ici : tracks ont été rafraîchies ET on a déjà un cache de features
+    # Here: tracks were refreshed AND we already have a features cache
     print(f"Found {len(existing_features)} audio features locally.")
     answer = (
         input("Do you want to refresh audio features for all tracks? [Y/n] ")
@@ -90,11 +90,11 @@ def get_features_for_tracks_with_cache(
         .lower()
     )
 
-    if answer in ("n", "no", "non"):
+    if answer in ("n", "no"):
         print("→ Keeping existing audio features; fetching only missing ones.")
         missing_ids = [tid for tid in track_ids if tid not in existing_features]
         if missing_ids:
-            print(f"Fetching audio features for {len(missing_ids)} missing tracks…")
+            print(f"Fetching audio features for {len(missing_ids)} missing tracks...")
             extra = get_audio_features(token_info, missing_ids)
             merged = {**existing_features, **extra}
         else:
@@ -102,7 +102,7 @@ def get_features_for_tracks_with_cache(
         save_features_cache(merged)
         return merged
 
-    # Refresh complet
+    # Full refresh
     print("→ Refreshing audio features for all tracks.")
     new_features = get_audio_features(token_info, track_ids)
     save_features_cache(new_features)

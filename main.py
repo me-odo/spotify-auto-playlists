@@ -1,4 +1,4 @@
-from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, OPENAI_API_KEY
+from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 from spotify_client import (
     load_spotify_token,
     get_current_user_id,
@@ -19,22 +19,21 @@ from playlist_manager import build_target_playlists, sync_playlists
 
 def get_tracks_with_cache(token_info) -> tuple[list, bool]:
     """
-    Retourne (tracks, tracks_refreshed)
-    - tracks : liste de Track
-    - tracks_refreshed : True si on a refait un appel à Spotify pour les titres likés.
+    Returns (tracks, tracks_refreshed)
+    - tracks: list of Track
+    - tracks_refreshed: True if we fetched liked tracks from Spotify again.
     """
     cached_tracks = load_tracks_cache()
     if cached_tracks:
-        print(f"Found {len(cached_tracks)} tracks locally in cache.")
+        print(f"Found {len(cached_tracks)} tracks in local cache.")
         answer = (
             input("Do you want to refresh them from Spotify? [Y/n] ").strip().lower()
         )
-        if answer in ("n", "no", "non"):
+        if answer in ("n", "no"):
             print("→ Using local cached tracks (no Spotify request).")
             return cached_tracks, False
-        print("→ Refreshing tracks from Spotify…")
+        print("→ Refreshing tracks from Spotify...")
 
-    # soit pas de cache, soit l'utilisateur a choisi de rafraîchir
     tracks = get_all_liked_tracks(token_info)
     save_tracks_cache(tracks)
     return tracks, True
@@ -69,7 +68,7 @@ def ask_refresh_classification_decision() -> bool:
 def main():
     if not (SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET):
         print(
-            "⚠️ Veuillez définir SPOTIFY_CLIENT_ID et SPOTIFY_CLIENT_SECRET dans le fichier .env."
+            "⚠ Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in the .env file."
         )
         return
 
@@ -107,7 +106,7 @@ def main():
         track_map,
     )
 
-    print("✅ Synchronisation terminée !")
+    print("✓ Synchronization complete!")
 
 
 if __name__ == "__main__":

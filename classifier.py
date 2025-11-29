@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from config import CLASSIFICATION_CACHE_FILE
 from models import Track, Classification
+from cli_utils import print_progress_bar
 
 
 def _ensure_classif_dir() -> None:
@@ -33,24 +34,27 @@ def classify_tracks(
     refresh_existing: bool = False,
 ) -> Dict[str, Classification]:
     """
-    Version simplifiée SANS IA :
-    - met tous les titres dans une catégorie 'all'
-    - permet quand même d'utiliser un cache sur le principe.
+    Simple classification without AI:
+    - put all tracks into a single 'all' category.
+    - still uses a cache in case we later extend this logic.
     """
     cache = load_classification_cache()
 
     if refresh_existing:
-        print("↻ Refresh du cache de classification (mode simple 'all').")
+        print("↻ Refreshing classification cache (simple 'all' mode).")
         cache = {}
 
-    # On pourrait utiliser features_by_id plus tard, mais pour l'instant on s'en fiche
+    # We don't use features yet, but we store them on the track object for future use
     for t in tracks:
-        # On ne fait rien de spécial avec les features actuellement
         t.features = features_by_id.get(t.id, {})
 
     classifications: Dict[str, Classification] = {}
 
-    for t in tracks:
+    to_process = tracks
+    total = len(to_process)
+    print("Classifying tracks (simple 'all' mode)...")
+
+    for idx, t in enumerate(to_process, start=1):
         if not refresh_existing and t.id in cache:
             c_dict = cache[t.id]
             classifications[t.id] = Classification(
@@ -58,22 +62,22 @@ def classify_tracks(
                 genre_macro=c_dict["genre_macro"],
                 extra=c_dict.get("extra", {}),
             )
-            continue
+        else:
+            c = Classification(
+                mood="all",
+                genre_macro="all",
+                extra={"note": "dummy classification without AI"},
+            )
+            classifications[t.id] = c
+            cache[t.id] = {
+                "mood": c.mood,
+                "genre_macro": c.genre_macro,
+                "extra": c.extra,
+            }
 
-        # Classification "dummy" : tout dans 'all'
-        c = Classification(
-            mood="all",
-            genre_macro="all",
-            extra={"note": "dummy classification without AI"},
-        )
-        classifications[t.id] = c
-        cache[t.id] = {
-            "mood": c.mood,
-            "genre_macro": c.genre_macro,
-            "extra": c.extra,
-        }
+        if total > 0:
+            print_progress_bar(idx, total, prefix="  Classifying")
 
-    # On sauve le cache à la fin
     save_classification_cache(cache)
-
+    print(f"\n→ Classification done for {len(classifications)} tracks (all -> 'all').")
     return classifications
