@@ -1,10 +1,11 @@
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
 # Base & cache directories
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
 DIFF_DIR = os.path.join(CACHE_DIR, "diffs")
 REPORTS_DIR = os.path.join(BASE_DIR, "reports")
@@ -43,4 +44,5 @@ SCOPES = [
 # Playlist name prefixes
 PLAYLIST_PREFIX_MOOD = "Auto – Mood – "
 PLAYLIST_PREFIX_GENRE = "Auto – Genre – "
+PLAYLIST_PREFIX_YEAR = "Auto – Year – "
 PLAYLIST_PREFIX_YEAR = "Auto – Year – "

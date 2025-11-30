@@ -1,15 +1,12 @@
 from collections import Counter
-import requests
 from typing import Dict, List
 
+import requests
 
-from app.core.cli_utils import (
-    print_info,
-)
-from app.spotify.auth import spotify_headers
-from app.config import (
-    SPOTIFY_API_BASE,
-)
+from app.config import SPOTIFY_API_BASE
+from app.core import log_info
+
+from .auth import spotify_headers
 
 
 def get_user_playlists(token_info: Dict) -> List[Dict]:
@@ -26,7 +23,7 @@ def get_user_playlists(token_info: Dict) -> List[Dict]:
         url = data.get("next")
         params = None
 
-    print_info(f"{len(playlists)} playlists found.")
+    log_info(f"{len(playlists)} playlists found.")
     return playlists
 
 
@@ -61,7 +58,7 @@ def find_or_create_playlist(
     playlist = r.json()
     existing_playlists.append(playlist)
 
-    print_info(f"Created new playlist: {name}")
+    log_info(f"Created new playlist: {name}")
     return playlist["id"]
 
 
@@ -224,7 +221,7 @@ def _remove_duplicate_tracks_fully(
         r = requests.delete(url_remove, headers=headers, json={"tracks": batch})
         r.raise_for_status()
 
-    print_info(f"Removed {len(duplicates)} duplicated tracks from playlist.")
+    log_info(f"Removed {len(duplicates)} duplicated tracks from playlist.")
 
 
 def _compute_tracks_to_add(
@@ -271,10 +268,11 @@ def incremental_update_playlist(
     )
 
     if not to_add:
-        print_info("Playlist already up to date (no new tracks to add).")
+        log_info("Playlist already up to date (no new tracks to add).")
         return
 
     # 4) Add new tracks
     _add_tracks_by_ids(token_info, playlist_id, to_add)
 
-    print_info(f"Added {len(to_add)} new tracks to playlist.")
+    log_info(f"Added {len(to_add)} new tracks to playlist.")
+    log_info(f"Added {len(to_add)} new tracks to playlist.")

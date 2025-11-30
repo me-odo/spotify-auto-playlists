@@ -1,31 +1,25 @@
-from .cli_utils import (
-    print_header,
-    print_info,
-    print_step,
-    print_success,
-    print_warning,
-    print_error,
-    print_question,
-    print_progress_bar,
+from .fs_utils import ensure_dir, ensure_parent_dir, read_json, write_json
+from .logging_config import configure_logging
+from .logging_utils import (
+    log_error,
+    log_info,
+    log_progress,
+    log_section,
+    log_step,
+    log_success,
+    log_warning,
 )
-from .fs_utils import (
-    ensure_parent_dir,
-    ensure_dir,
-    write_json,
-    read_json,
-)
-from .models import Track, Classification
-
+from .models import Classification, Track
 
 __all__ = [
-    "print_header",
-    "print_info",
-    "print_step",
-    "print_success",
-    "print_warning",
-    "print_error",
-    "print_question",
-    "print_progress_bar",
+    "configure_logging",
+    "log_section",
+    "log_info",
+    "log_step",
+    "log_success",
+    "log_warning",
+    "log_error",
+    "log_progress",
     "ensure_parent_dir",
     "ensure_dir",
     "write_json",

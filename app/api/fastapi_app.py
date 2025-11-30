@@ -3,7 +3,7 @@ from typing import Any, Dict
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from app.pipeline.orchestration import PipelineOptions, run_pipeline
+from app.pipeline import PipelineOptions, run_pipeline
 
 app = FastAPI(
     title="Spotify Auto-Playlists API",
@@ -34,7 +34,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
       "refresh_tracks": false,
       "force_external_refresh": false,
       "refresh_classification": false,
-      "apply_changes": false,
+      "apply_changes": false
     }
     """
     opts = PipelineOptions(

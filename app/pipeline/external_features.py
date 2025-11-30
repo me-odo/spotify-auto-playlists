@@ -1,21 +1,18 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 import requests
 
-from app.core.cli_utils import (
-    print_step,
-    print_info,
-    print_warning,
-    print_progress_bar,
+from app.config import EXTERNAL_FEATURES_CACHE_FILE, MUSICBRAINZ_USER_AGENT
+from app.core import (
+    Track,
+    log_info,
+    log_progress,
+    log_step,
+    log_warning,
+    read_json,
+    write_json,
 )
-from app.config import (
-    EXTERNAL_FEATURES_CACHE_FILE,
-    MUSICBRAINZ_USER_AGENT,
-)
-from app.core.fs_utils import write_json, read_json
-from app.core.models import Track
-
 
 MUSICBRAINZ_API_BASE = "https://musicbrainz.org/ws/2"
 ACOUSTICBRAINZ_API_BASE = "https://acousticbrainz.org/api/v1"
@@ -28,7 +25,7 @@ MB_HEADERS = {
 
 def load_external_features_cache() -> Dict[str, Dict]:
     def _on_error(e: Exception) -> None:
-        print_warning("External features cache file is corrupted; ignoring it.")
+        log_warning("External features cache file is corrupted; ignoring it.")
 
     return read_json(EXTERNAL_FEATURES_CACHE_FILE, default={}, on_error=_on_error)
 
@@ -151,7 +148,7 @@ def _process_missing_external_features(
     if total_to_process == 0:
         return 0
 
-    print_info(f"{total_to_process} tracks to resolve externally.")
+    log_info(f"{total_to_process} tracks to resolve externally.")
 
     # Parallel execution: only network calls happen in threads.
     # Cache updates happen in the main thread.
@@ -164,7 +161,7 @@ def _process_missing_external_features(
 
         for future in as_completed(future_to_track):
             processed += 1
-            print_progress_bar(processed, total_to_process, prefix="  External lookup")
+            log_progress(processed, total_to_process, prefix="  External lookup")
 
             try:
                 track_id, entry = future.result()
@@ -216,9 +213,7 @@ def enrich_tracks_with_external_features(
       - shared state (cache, external_features) is only modified from the main thread,
         based on worker results → no concurrent writes, no race conditions.
     """
-    print_step(
-        "Fetching external mood/genre features (MusicBrainz + AcousticBrainz)..."
-    )
+    log_step("Fetching external mood/genre features (MusicBrainz + AcousticBrainz)...")
 
     # Load existing cache from disk
     cache = load_external_features_cache()
@@ -232,7 +227,7 @@ def enrich_tracks_with_external_features(
 
     # If nothing to process, we only rely on cache
     if not to_process:
-        print_info(
+        log_info(
             f"Using existing external features cache; "
             f"{len(external_features)} tracks already have external data."
         )
@@ -249,7 +244,7 @@ def enrich_tracks_with_external_features(
     # Final log: build unmatched list (tracks with no external data at all)
     unmatched = _build_unmatched_tracks(tracks, external_features)
 
-    print_info(
+    log_info(
         f"External features available for {len(external_features)} tracks "
         f"(tracks processed: {total_processed})."
     )

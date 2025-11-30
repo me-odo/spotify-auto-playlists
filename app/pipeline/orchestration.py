@@ -1,23 +1,19 @@
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
-from app.pipeline.cache_manager import load_tracks_cache, save_tracks_cache
-from app.pipeline.classifier import (
-    classify_tracks_rule_based,
-)
-from app.pipeline.external_features import enrich_tracks_with_external_features
-from app.pipeline.playlist_manager import build_target_playlists, sync_playlists
-from app.pipeline.reporting import write_unmatched_report
-from app.spotify.auth import load_spotify_token, get_current_user_id
-from app.spotify.tracks import get_all_liked_tracks
-from app.spotify.playlists import get_user_playlists
-from app.core.cli_utils import (
-    print_step,
-    print_info,
-    print_header,
-    print_success,
-)
+from app.core import log_info, log_section, log_step, log_success
 from app.core.models import Track
+from app.spotify import (
+    get_all_liked_tracks,
+    get_current_user_id,
+    get_user_playlists,
+    load_spotify_token,
+)
+
+from .cache_manager import load_tracks_cache, save_tracks_cache
+from .classifier import classify_tracks_rule_based
+from .external_features import enrich_tracks_with_external_features
+from .playlist_manager import build_target_playlists, sync_playlists
 
 
 @dataclass
@@ -39,23 +35,23 @@ def _load_tracks_for_pipeline(
 
     if opts.refresh_tracks or not cached_tracks:
         if cached_tracks and opts.refresh_tracks:
-            print_step("Refreshing liked tracks from Spotify (forced)...")
+            log_step("Refreshing liked tracks from Spotify (forced)...")
         else:
-            print_step("Fetching liked tracks from Spotify (no local cache)...")
+            log_step("Fetching liked tracks from Spotify (no local cache)...")
 
         tracks = get_all_liked_tracks(token_info)
         save_tracks_cache(tracks)
         tracks_refreshed = True
     else:
-        print_step("Using cached liked tracks.")
+        log_step("Using cached liked tracks.")
         tracks = cached_tracks
 
-    print_info(f"Pipeline will use {len(tracks)} liked tracks.")
+    log_info(f"Pipeline will use {len(tracks)} liked tracks.")
     return tracks, tracks_refreshed
 
 
 def run_pipeline(opts: PipelineOptions) -> Dict[str, Any]:
-    print_header("Spotify auto-playlists (API pipeline)")
+    log_section("Spotify auto-playlists (pipeline)")
 
     token_info = load_spotify_token()
     user_id = get_current_user_id(token_info)
@@ -67,15 +63,6 @@ def run_pipeline(opts: PipelineOptions) -> Dict[str, Any]:
         tracks,
         force_refresh=opts.force_external_refresh,
     )
-    if unmatched_tracks:
-        report_path = write_unmatched_report(
-            unmatched_tracks,
-            filename="unmatched_external_features.md",
-        )
-        print_info(
-            f"External features missing for {len(unmatched_tracks)} tracks. "
-            f"Report: {report_path}"
-        )
 
     classifications = classify_tracks_rule_based(
         tracks=tracks,
@@ -125,10 +112,12 @@ def run_pipeline(opts: PipelineOptions) -> Dict[str, Any]:
     return result
 
 
-def run_cli_pipeline() -> None:
+def run_pipeline_entrypoint() -> None:
     """
-    Simple CLI runner around the pipeline.
-    No interactive prompts: behaviour is fully controlled by PipelineOptions.
+    Simple Python entrypoint around the pipeline.
+
+    Behaviour is fully controlled by PipelineOptions and uses safe defaults
+    (preview-only, no writes to Spotify).
     """
     opts = PipelineOptions(
         refresh_tracks=False,
@@ -137,4 +126,7 @@ def run_cli_pipeline() -> None:
         apply_changes=False,  # safe-by-default: preview only
     )
     run_pipeline(opts)
-    print_success("Pipeline run finished (CLI helper).")
+    log_success("Pipeline run finished (entrypoint).")
+    run_pipeline(opts)
+    log_success("Pipeline run finished (entrypoint).")
+    log_success("Pipeline run finished (entrypoint).")

@@ -3,25 +3,28 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict
-from urllib.parse import urlencode, urlparse, parse_qs
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import requests
 
 from app.config import (
+    SCOPES,
+    SPOTIFY_API_BASE,
+    SPOTIFY_AUTH_URL,
     SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET,
     SPOTIFY_REDIRECT_URI,
-    SPOTIFY_AUTH_URL,
-    SPOTIFY_TOKEN_URL,
-    SPOTIFY_API_BASE,
-    SCOPES,
     SPOTIFY_TOKEN_FILE,
+    SPOTIFY_TOKEN_URL,
 )
-from app.core.cli_utils import print_step, print_info
-from app.core.fs_utils import write_json, read_json
+from app.core import log_info, log_step, log_warning, read_json, write_json
 
 
 class _SpotifyAuthHandler(BaseHTTPRequestHandler):
+    """
+    Minimal HTTP handler to capture the ?code=... from Spotify redirect.
+    """
+
     authorization_code: str | None = None
 
     def do_GET(self):
@@ -40,7 +43,7 @@ class _SpotifyAuthHandler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, format, *args):
-        # silence default HTTP server logs
+        # Silence default HTTP server logging
         return
 
 
@@ -81,16 +84,16 @@ def _get_spotify_token_local_server() -> Dict:
     url_args = urlencode(auth_query_parameters)
     auth_url = f"{SPOTIFY_AUTH_URL}/?{url_args}"
 
-    print_step("Opening browser for Spotify authorization...")
-    print_info(
-        f"If your browser does not open automatically, copy/paste this URL manually:\n{auth_url}"
+    log_step("Opening browser for Spotify authorization...")
+    log_info(
+        "If your browser does not open automatically, copy/paste this URL manually:"
     )
+    log_info(auth_url)
 
     try:
         webbrowser.open(auth_url)
-    except Exception:
-        # si l'ouverture auto échoue, l'URL affichée suffit
-        pass
+    except Exception as e:
+        log_warning(f"Failed to open browser automatically: {e}")
 
     code = _run_local_http_server_for_auth(timeout=180)
 
@@ -140,13 +143,13 @@ def load_spotify_token() -> Dict:
     """
     token_info = read_json(SPOTIFY_TOKEN_FILE, default=None)
     if token_info is None:
-        print_info("Spotify authentication required. Waiting for user authorization...")
+        log_info("Spotify authentication required. Waiting for user authorization...")
         token_info = get_spotify_token()
 
     now = int(time.time())
     expires_in = token_info.get("expires_in", 3600)
     if now - token_info.get("timestamp", 0) > expires_in - 60:
-        print_info("Spotify access token expired. Refreshing...")
+        log_info("Spotify access token expired. Refreshing...")
         token_info = refresh_spotify_token(token_info["refresh_token"])
     return token_info
 

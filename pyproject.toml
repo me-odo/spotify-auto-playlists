@@ -8,23 +8,32 @@ version = "0.1.0"
 description = "Backend API for mood-based Spotify auto playlists."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [
-  { name = "me-odo" }
-]
-dependencies = [
-  "fastapi",
-  "uvicorn[standard]",
-  "python-dotenv",
-  "requests",
-]
+authors = [{ name = "me-odo" }]
+dependencies = ["fastapi", "uvicorn[standard]", "python-dotenv", "requests"]
 
 [project.optional-dependencies]
-dev = [
-  "black",
-  "ruff",
-  "mypy",
-  "pytest",
-]
+dev = ["black", "ruff", "mypy", "pytest"]
 
 [tool.setuptools]
 packages = ["app"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+# Treat "app" as first-party (your code)
+known_first_party = ["app"]
+
+# Section order:
+# - FUTURE (from __future__)
+# - STDLIB (Python stdlib)
+# - THIRDPARTY (pip dependencies)
+# - FIRSTPARTY (your packages: app.core, app.pipeline, app.spotify, app.api)
+# - LOCALFOLDER (relative imports: from .something import X)
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+default_section = "THIRDPARTY"
+
+# Small niceties
+combine_as_imports = true
+include_trailing_comma = true
+multi_line_output = 3

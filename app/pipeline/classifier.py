@@ -1,13 +1,15 @@
 from typing import Dict, List, Optional
 
 from app.config import CLASSIFICATION_CACHE_FILE
-from app.core.cli_utils import (
-    print_info,
-    print_step,
-    print_progress_bar,
+from app.core import (
+    Classification,
+    Track,
+    log_info,
+    log_progress,
+    log_step,
+    read_json,
+    write_json,
 )
-from app.core.fs_utils import write_json, read_json
-from app.core.models import Track, Classification
 
 
 def load_classification_cache() -> Dict[str, Dict]:
@@ -145,10 +147,10 @@ def _log_mood_summary(classifications: Dict[str, Classification]) -> None:
     for c in classifications.values():
         mood_counts[c.mood] = mood_counts.get(c.mood, 0) + 1
 
-    print_info("Classification done.")
-    print_info("Tracks per mood:")
+    log_info("Classification done.")
+    log_info("Tracks per mood:")
     for mood, count in sorted(mood_counts.items(), key=lambda x: x[0]):
-        print_info(f"    {mood}: {count}")
+        log_info(f"    {mood}: {count}")
 
 
 def classify_tracks_rule_based(
@@ -167,13 +169,13 @@ def classify_tracks_rule_based(
     cache = load_classification_cache()
 
     if refresh_existing:
-        print_info("Refreshing classification cache (rule-based mood model).")
+        log_info("Refreshing classification cache (rule-based mood model).")
         cache = {}
 
     classifications: Dict[str, Classification] = {}
     total = len(tracks)
 
-    print_step("Classifying tracks (rule-based mood model)...")
+    log_step("Classifying tracks (rule-based mood model)...")
 
     for idx, track in enumerate(tracks, start=1):
         classification = _classify_single_track(
@@ -188,9 +190,11 @@ def classify_tracks_rule_based(
         classifications[track.id] = classification
 
         if total > 0:
-            print_progress_bar(idx, total, prefix="  Classifying")
+            log_progress(idx, total, prefix="  Classifying")
 
     save_classification_cache(cache)
     _log_mood_summary(classifications)
+
+    return classifications
 
     return classifications

@@ -2,8 +2,7 @@ from dataclasses import asdict
 from typing import List
 
 from app.config import TRACKS_CACHE_FILE
-from app.core.fs_utils import write_json, read_json
-from app.core.models import Track
+from app.core import Track, read_json, write_json
 
 
 def load_tracks_cache() -> List[Track]:

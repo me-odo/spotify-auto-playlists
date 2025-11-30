@@ -1,21 +1,15 @@
-import requests
 from typing import Dict, List
 
+import requests
 
-from app.core.cli_utils import (
-    print_step,
-    print_info,
-    print_progress_bar,
-)
-from app.spotify.auth import spotify_headers
-from app.config import (
-    SPOTIFY_API_BASE,
-)
-from app.core.models import Track
+from app.config import SPOTIFY_API_BASE
+from app.core import Track, log_info, log_progress, log_step
+
+from .auth import spotify_headers
 
 
 def get_all_liked_tracks(token_info: Dict) -> List[Track]:
-    print_step("Fetching liked tracks from Spotify...")
+    log_step("Fetching liked tracks from Spotify...")
     tracks: List[Track] = []
     url = f"{SPOTIFY_API_BASE}/me/tracks"
     params = {"limit": 50}
@@ -51,7 +45,8 @@ def get_all_liked_tracks(token_info: Dict) -> List[Track]:
 
         if total:
             estimated_pages = (total + 49) // 50
-            print_progress_bar(page, estimated_pages, prefix="  Fetching pages")
+            log_progress(page, estimated_pages, prefix="  Fetching pages")
 
-    print_info(f"{len(tracks)} liked tracks fetched.")
+    log_info(f"{len(tracks)} liked tracks fetched.")
+    return tracks
     return tracks

@@ -1,17 +1,18 @@
-from collections import Counter
 import os
-from typing import Dict, List, Tuple, Any, Optional
+from collections import Counter
+from typing import Any, Dict, List, Tuple
 
 from app.config import DIFF_DIR, PLAYLIST_PREFIX_MOOD
-from app.core.cli_utils import (
-    print_header,
-    print_step,
-    print_info,
-    print_success,
+from app.core import (
+    Classification,
+    Track,
+    ensure_dir,
+    log_info,
+    log_section,
+    log_step,
+    log_success,
 )
-from app.core.fs_utils import ensure_dir
-from app.core.models import Track, Classification
-from app.spotify.playlists import (
+from app.spotify import (
     find_or_create_playlist,
     get_playlist_tracks,
     incremental_update_playlist,
@@ -205,7 +206,7 @@ def _should_apply_changes(apply_changes: bool) -> bool:
     Returns True if the operation should proceed, False if it should be a preview only.
     """
     if not apply_changes:
-        print_info("Preview mode: no changes will be applied to Spotify.")
+        log_info("Preview mode: no changes will be applied to Spotify.")
         return False
     return True
 
@@ -255,14 +256,14 @@ def sync_playlists(
     )
 
     if not target_playlists:
-        print_info("No target playlists to sync.")
+        log_info("No target playlists to sync.")
         return []
 
     ensure_dir(DIFF_DIR)
     diffs: List[Dict[str, Any]] = []
 
-    print_header("Preview of incremental playlist changes")
-    print_info(
+    log_section("Preview of incremental playlist changes")
+    log_info(
         "Diff details will be written to .diff files in the 'cache/diffs' folder.\n"
     )
 
@@ -270,7 +271,7 @@ def sync_playlists(
 
     # 2) Build diff entries and write .diff files when there are changes
     for idx, (name, target_ids) in enumerate(target_playlists.items(), start=1):
-        print_info(f"[{idx}/{total_playlists}] Playlist: {name}")
+        log_info(f"[{idx}/{total_playlists}] Playlist: {name}")
 
         diff_entry = _compute_playlist_diff(
             name=name,
@@ -285,7 +286,7 @@ def sync_playlists(
 
         # If nothing changes for this playlist, no diff file, minimal log
         if not duplicates and not new_to_add:
-            print_info("  No changes for this playlist (already up to date).")
+            log_info("  No changes for this playlist (already up to date).")
             continue
 
         diff_path = _write_diff_file(diff_entry, track_map)
@@ -293,18 +294,18 @@ def sync_playlists(
         existing_ids = diff_entry["existing_ids"]
         target_set = set(diff_entry["target_ids"])
 
-        print_info(f"  Current        : {len(existing_ids)} tracks")
-        print_info(f"  Target (unique): {len(target_set)} tracks")
-        print_info(f"  Duplicates to remove : {len(duplicates)}")
-        print_info(f"  New tracks to add    : {len(new_to_add)}")
-        print_step(f"Diff written to: {diff_path}\n")
+        log_info(f"  Current        : {len(existing_ids)} tracks")
+        log_info(f"  Target (unique): {len(target_set)} tracks")
+        log_info(f"  Duplicates to remove : {len(duplicates)}")
+        log_info(f"  New tracks to add    : {len(new_to_add)}")
+        log_step(f"Diff written to: {diff_path}\n")
 
     # 3) Check if ANY playlist actually needs changes
     has_changes = any(d["duplicates"] or d["new_to_add"] for d in diffs)
 
     if not has_changes:
-        print_success("No changes detected. All playlists are already up to date.")
-        print_info("No Spotify operations are required.")
+        log_success("No changes detected. All playlists are already up to date.")
+        log_info("No Spotify operations are required.")
         return diffs
 
     # 4) Decide whether to apply changes (preview or actual update)
@@ -312,7 +313,7 @@ def sync_playlists(
         return diffs
 
     # 5) Either apply_changes is True, or user confirmed
-    print_step("Applying incremental changes to Spotify...")
+    log_step("Applying incremental changes to Spotify...")
 
     for diff in diffs:
         # Skip playlists that had no changes
@@ -331,8 +332,9 @@ def sync_playlists(
             )
             diff["playlist_id"] = playlist_id  # keep info in sync with reality
 
-        print_info(f"  Incremental sync of playlist: {name}")
+        log_info(f"  Incremental sync of playlist: {name}")
         incremental_update_playlist(token_info, playlist_id, target_ids)
 
-    print_success("Playlists synchronized (incremental).")
+    log_success("Playlists synchronized (incremental).")
+    return diffs
     return diffs
