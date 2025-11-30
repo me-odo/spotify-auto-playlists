@@ -20,7 +20,7 @@ SPOTIFY_TOKEN_FILE = os.path.join(CACHE_DIR, "spotify_token.json")
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 SPOTIFY_REDIRECT_URI = os.getenv(
-    "SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback"
+    "SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/auth/callback"
 )
 
 # Spotify API constants

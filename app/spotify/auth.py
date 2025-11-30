@@ -1,9 +1,6 @@
-import threading
 import time
-import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import urlencode
 
 import requests
 
@@ -17,86 +14,36 @@ from app.config import (
     SPOTIFY_TOKEN_FILE,
     SPOTIFY_TOKEN_URL,
 )
-from app.core import log_info, log_step, log_warning, read_json, write_json
+from app.core import log_info, log_warning, read_json, write_json
 
 
-class _SpotifyAuthHandler(BaseHTTPRequestHandler):
+class SpotifyAuthError(Exception):
+    """Base error for Spotify auth."""
+
+
+class SpotifyTokenMissing(SpotifyAuthError):
+    """Raised when no token is available and user must authorize."""
+
+
+def build_spotify_auth_url() -> str:
     """
-    Minimal HTTP handler to capture the ?code=... from Spotify redirect.
+    Build the Spotify /authorize URL that the frontend (or user)
+    should open in a browser to start the OAuth flow.
     """
-
-    authorization_code: str | None = None
-
-    def do_GET(self):
-        parsed = urlparse(self.path)
-        qs = parse_qs(parsed.query)
-        code = qs.get("code", [None])[0]
-        _SpotifyAuthHandler.authorization_code = code
-
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.end_headers()
-        self.wfile.write(
-            b"<html><body><h1>Spotify authorization complete</h1>"
-            b"<p>You can close this window and return to the application.</p>"
-            b"</body></html>"
-        )
-
-    def log_message(self, format, *args):
-        # Silence default HTTP server logging
-        return
-
-
-def _run_local_http_server_for_auth(timeout: int = 180) -> str:
-    parsed = urlparse(SPOTIFY_REDIRECT_URI)
-    host = parsed.hostname or "127.0.0.1"
-    port = parsed.port or 8888
-
-    _SpotifyAuthHandler.authorization_code = None
-    httpd = HTTPServer((host, port), _SpotifyAuthHandler)
-
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
-
-    try:
-        start = time.time()
-        while time.time() - start < timeout:
-            if _SpotifyAuthHandler.authorization_code:
-                return _SpotifyAuthHandler.authorization_code
-            time.sleep(0.2)
-    finally:
-        httpd.shutdown()
-        httpd.server_close()
-
-    raise TimeoutError("Timed out waiting for Spotify authorization.")
-
-
-def _get_spotify_token_local_server() -> Dict:
-    """
-    Authorization Code flow using a local HTTP server and the user's browser.
-    """
-    auth_query_parameters = {
+    params = {
         "response_type": "code",
+        "client_id": SPOTIFY_CLIENT_ID,
         "redirect_uri": SPOTIFY_REDIRECT_URI,
         "scope": " ".join(SCOPES),
-        "client_id": SPOTIFY_CLIENT_ID,
     }
-    url_args = urlencode(auth_query_parameters)
-    auth_url = f"{SPOTIFY_AUTH_URL}/?{url_args}"
+    return f"{SPOTIFY_AUTH_URL}?{urlencode(params)}"
 
-    log_step("Opening browser for Spotify authorization...")
-    log_info(
-        "If your browser does not open automatically, copy/paste this URL manually:"
-    )
-    log_info(auth_url)
 
-    try:
-        webbrowser.open(auth_url)
-    except Exception as e:
-        log_warning(f"Failed to open browser automatically: {e}")
-
-    code = _run_local_http_server_for_auth(timeout=180)
-
+def exchange_code_for_token(code: str) -> Dict:
+    """
+    Exchange an authorization code (from /auth/callback) for an access/refresh token.
+    Persist the token to SPOTIFY_TOKEN_FILE.
+    """
     token_data = {
         "grant_type": "authorization_code",
         "code": code,
@@ -110,15 +57,8 @@ def _get_spotify_token_local_server() -> Dict:
     token_info = r.json()
     token_info["timestamp"] = int(time.time())
     write_json(SPOTIFY_TOKEN_FILE, token_info)
+    log_info("Spotify token obtained and stored.")
     return token_info
-
-
-def get_spotify_token() -> Dict:
-    """
-    Get a new Spotify access/refresh token via authorization code flow,
-    using a local HTTP server and the user's browser.
-    """
-    return _get_spotify_token_local_server()
 
 
 def refresh_spotify_token(refresh_token: str) -> Dict:
@@ -131,25 +71,34 @@ def refresh_spotify_token(refresh_token: str) -> Dict:
     r = requests.post(SPOTIFY_TOKEN_URL, data=token_data)
     r.raise_for_status()
     token_info = r.json()
+    # Spotify peut ne pas renvoyer à nouveau un refresh_token : on garde l'ancien
     token_info["refresh_token"] = refresh_token
     token_info["timestamp"] = int(time.time())
     write_json(SPOTIFY_TOKEN_FILE, token_info)
+    log_info("Spotify access token refreshed.")
     return token_info
 
 
 def load_spotify_token() -> Dict:
     """
-    Load Spotify token from cache, or perform auth flow if missing/expired.
+    Load Spotify token from cache, or raise SpotifyTokenMissing if absent.
+
+    - No more automatic browser open / local HTTP server.
+    - The API layer is responsible for detecting SpotifyTokenMissing and
+      returning a 401 with an auth_url to the client.
     """
     token_info = read_json(SPOTIFY_TOKEN_FILE, default=None)
     if token_info is None:
-        log_info("Spotify authentication required. Waiting for user authorization...")
-        token_info = get_spotify_token()
+        log_warning("No Spotify token found in cache.")
+        raise SpotifyTokenMissing("No Spotify token available.")
 
     now = int(time.time())
     expires_in = token_info.get("expires_in", 3600)
     if now - token_info.get("timestamp", 0) > expires_in - 60:
         log_info("Spotify access token expired. Refreshing...")
+        if "refresh_token" not in token_info:
+            log_warning("No refresh_token available – re-authorization required.")
+            raise SpotifyTokenMissing("No valid refresh token available.")
         token_info = refresh_spotify_token(token_info["refresh_token"])
     return token_info
 
