@@ -13,6 +13,7 @@ REPORTS_DIR = os.path.join(BASE_DIR, "reports")
 TRACKS_CACHE_FILE = os.path.join(CACHE_DIR, "tracks.json")
 CLASSIFICATION_CACHE_FILE = os.path.join(CACHE_DIR, "track_classification_cache.json")
 EXTERNAL_FEATURES_CACHE_FILE = os.path.join(CACHE_DIR, "external_features.json")
+SPOTIFY_TOKEN_FILE = os.path.join(CACHE_DIR, "spotify_token.json")
 
 # Spotify credentials (REQUIRED)
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")

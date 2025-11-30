@@ -1,4 +1,3 @@
-import json
 import os
 from typing import Dict, List
 
@@ -8,23 +7,20 @@ from cli_utils import (
     print_step,
     print_progress_bar,
 )
-from fs_utils import ensure_parent_dir
+from fs_utils import write_json, read_json
 from models import Track, Classification
 
 
 def load_classification_cache() -> Dict[str, Dict]:
-    if CLASSIFICATION_CACHE_FILE and os.path.exists(CLASSIFICATION_CACHE_FILE):
-        with open(CLASSIFICATION_CACHE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+    if not CLASSIFICATION_CACHE_FILE:
+        return {}
+    return read_json(CLASSIFICATION_CACHE_FILE, default={})
 
 
 def save_classification_cache(cache: Dict[str, Dict]) -> None:
     if not CLASSIFICATION_CACHE_FILE:
         return
-    ensure_parent_dir(CLASSIFICATION_CACHE_FILE)
-    with open(CLASSIFICATION_CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
+    write_json(CLASSIFICATION_CACHE_FILE, cache)
 
 
 def _get_prob(highlevel: Dict, feature: str, label: str) -> float:

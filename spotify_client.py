@@ -16,10 +16,12 @@ from config import (
     SPOTIFY_CLIENT_SECRET,
     SPOTIFY_REDIRECT_URI,
     SPOTIFY_AUTH_URL,
+    SPOTIFY_TOKEN_FILE,
     SPOTIFY_TOKEN_URL,
     SPOTIFY_API_BASE,
     SCOPES,
 )
+from fs_utils import write_json, read_json
 from models import Track
 
 
@@ -62,8 +64,7 @@ def get_spotify_token() -> Dict:
     r.raise_for_status()
     token_info = r.json()
     token_info["timestamp"] = int(time.time())
-    with open("spotify_token.json", "w", encoding="utf-8") as f:
-        json.dump(token_info, f, ensure_ascii=False, indent=2)
+    write_json(SPOTIFY_TOKEN_FILE, token_info)
     return token_info
 
 
@@ -79,16 +80,13 @@ def refresh_spotify_token(refresh_token: str) -> Dict:
     token_info = r.json()
     token_info["refresh_token"] = refresh_token
     token_info["timestamp"] = int(time.time())
-    with open("spotify_token.json", "w", encoding="utf-8") as f:
-        json.dump(token_info, f, ensure_ascii=False, indent=2)
+    write_json(SPOTIFY_TOKEN_FILE, token_info)
     return token_info
 
 
 def load_spotify_token() -> Dict:
-    if os.path.exists("spotify_token.json"):
-        with open("spotify_token.json", "r", encoding="utf-8") as f:
-            token_info = json.load(f)
-    else:
+    token_info = read_json(SPOTIFY_TOKEN_FILE, default=None)
+    if token_info is None:
         token_info = get_spotify_token()
 
     now = int(time.time())

@@ -1,8 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import json
-import os
-import requests
 from typing import Dict, List, Tuple, Optional
+
+import requests
 
 from cli_utils import (
     print_step,
@@ -14,7 +13,7 @@ from config import (
     EXTERNAL_FEATURES_CACHE_FILE,
     MUSICBRAINZ_USER_AGENT,
 )
-from fs_utils import ensure_parent_dir
+from fs_utils import write_json, read_json
 from models import Track
 
 
@@ -28,16 +27,14 @@ MB_HEADERS = {
 
 
 def load_external_features_cache() -> Dict[str, Dict]:
-    if not os.path.exists(EXTERNAL_FEATURES_CACHE_FILE):
-        return {}
-    with open(EXTERNAL_FEATURES_CACHE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    def _on_error(e: Exception) -> None:
+        print_warning("External features cache file is corrupted; ignoring it.")
+
+    return read_json(EXTERNAL_FEATURES_CACHE_FILE, default={}, on_error=_on_error)
 
 
 def save_external_features_cache(cache: Dict[str, Dict]) -> None:
-    ensure_parent_dir(EXTERNAL_FEATURES_CACHE_FILE)
-    with open(EXTERNAL_FEATURES_CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
+    write_json(EXTERNAL_FEATURES_CACHE_FILE, cache)
 
 
 def _search_musicbrainz_recording(track: Track) -> Optional[str]:
