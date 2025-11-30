@@ -203,7 +203,5 @@ def enrich_tracks_with_external_features(
         f"External features available for {len(external_features)} tracks "
         f"(tracks processed: {total_to_process})."
     )
-    if unmatched:
-        print_warning(f"External features missing for {len(unmatched)} tracks.")
 
     return external_features, unmatched

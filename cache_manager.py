@@ -1,5 +1,4 @@
 from dataclasses import asdict
-import os
 from typing import List
 
 from config import TRACKS_CACHE_FILE

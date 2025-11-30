@@ -1,3 +1,5 @@
+import sys
+
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 from spotify_client import (
     load_spotify_token,
@@ -78,7 +80,7 @@ def ask_refresh_classification_decision() -> bool:
     return True
 
 
-def main() -> None:
+def main(use_cli_auth: bool = False) -> None:
     # 0) Basic config check
     if not (SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET):
         print_error(
@@ -90,7 +92,7 @@ def main() -> None:
 
     # 1) Auth + user + existing playlists
     print_step("Loading Spotify token...")
-    token_info = load_spotify_token()
+    token_info = load_spotify_token(use_cli_auth=use_cli_auth)
 
     print_step("Fetching current Spotify user...")
     user_id = get_current_user_id(token_info)
@@ -153,4 +155,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    use_cli_auth = "--cli-auth" in sys.argv
+    main(use_cli_auth=use_cli_auth)

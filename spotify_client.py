@@ -1,35 +1,168 @@
 from collections import Counter
-import json
-import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import platform
 import requests
+import subprocess
 import time
+import threading
 from typing import Dict, List
-import webbrowser
+from urllib.parse import urlencode, urlparse, parse_qs
+
 
 from cli_utils import (
     print_step,
     print_info,
     print_progress_bar,
+    print_warning,
 )
 from config import (
     SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET,
     SPOTIFY_REDIRECT_URI,
     SPOTIFY_AUTH_URL,
-    SPOTIFY_TOKEN_FILE,
     SPOTIFY_TOKEN_URL,
     SPOTIFY_API_BASE,
     SCOPES,
+    SPOTIFY_TOKEN_FILE,
 )
 from fs_utils import write_json, read_json
 from models import Track
 
 
-def get_spotify_token() -> Dict:
+def _try_open_browser(url: str) -> None:
     """
-    Simplified auth code flow:
-    - open browser with auth URL
-    - user pastes the "code" parameter from redirect URL
+    Try to open a URL in the system browser without printing anything
+    to the current terminal (stdout/stderr are suppressed).
+    """
+    try:
+        system = platform.system()
+        if system == "Darwin":
+            cmd = ["open", url]
+        elif system == "Windows":
+            cmd = ["cmd", "/c", "start", "", url]
+        else:
+            # Linux / other Unix – use xdg-open
+            cmd = ["xdg-open", url]
+
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        # If this fails, the user still has the URL printed in the terminal
+        pass
+
+
+class _SpotifyAuthHandler(BaseHTTPRequestHandler):
+    """
+    Simple HTTP handler that captures the 'code' query parameter from
+    the redirect URI and stores it on the class.
+    """
+
+    authorization_code: str | None = None
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        code = qs.get("code", [None])[0]
+
+        # Log what we actually received (for debugging)
+        print_info(f"Auth callback received: path={parsed.path}, has_code={bool(code)}")
+
+        if code:
+            _SpotifyAuthHandler.authorization_code = code
+            message = (
+                "<h1>Spotify authorization complete</h1>"
+                "<p>You can close this window and return to the application.</p>"
+            )
+        else:
+            message = (
+                "<h1>Spotify authorization callback</h1>"
+                "<p>No authorization code was found in the URL.</p>"
+                "<p>If you opened this URL manually, please close this window and "
+                "let the Spotify login page redirect you here automatically.</p>"
+            )
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(message.encode("utf-8"))
+
+    def log_message(self, format, *args):
+        # Silence default HTTP server logging in the console
+        return
+
+
+def _run_local_http_server_for_auth(timeout: int = 180) -> str:
+    """
+    Start a local HTTP server on the host/port defined in SPOTIFY_REDIRECT_URI,
+    wait for a single request with a 'code' query parameter, then return it.
+    Raises TimeoutError if nothing arrives within `timeout` seconds.
+    """
+    parsed = urlparse(SPOTIFY_REDIRECT_URI)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or 8888
+
+    _SpotifyAuthHandler.authorization_code = None
+    httpd = HTTPServer((host, port), _SpotifyAuthHandler)
+
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        start = time.time()
+        while time.time() - start < timeout:
+            if _SpotifyAuthHandler.authorization_code:
+                return _SpotifyAuthHandler.authorization_code
+            time.sleep(0.2)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+    raise TimeoutError("Timed out waiting for Spotify authorization.")
+
+
+def _get_spotify_token_local_server() -> Dict:
+    auth_query_parameters = {
+        "response_type": "code",
+        "redirect_uri": SPOTIFY_REDIRECT_URI,
+        "scope": " ".join(SCOPES),
+        "client_id": SPOTIFY_CLIENT_ID,
+    }
+    url_args = urlencode(auth_query_parameters)
+    auth_url = f"{SPOTIFY_AUTH_URL}/?{url_args}"
+
+    print_step("Opening browser for Spotify authorization...")
+    print_info(
+        f"If your browser does not open automatically, copy/paste this URL manually:\n{auth_url}"
+    )
+
+    _try_open_browser(auth_url)
+
+    code = _run_local_http_server_for_auth(timeout=180)
+
+    token_data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": SPOTIFY_REDIRECT_URI,
+        "client_id": SPOTIFY_CLIENT_ID,
+        "client_secret": SPOTIFY_CLIENT_SECRET,
+    }
+
+    r = requests.post(SPOTIFY_TOKEN_URL, data=token_data)
+    r.raise_for_status()
+    token_info = r.json()
+    token_info["timestamp"] = int(time.time())
+    write_json(SPOTIFY_TOKEN_FILE, token_info)
+    return token_info
+
+
+def _get_spotify_token_cli() -> Dict:
+    """
+    Legacy CLI-based flow:
+      - print auth URL
+      - user manually copies browser redirect `code` back into the terminal.
     """
     from urllib.parse import urlencode
 
@@ -41,12 +174,10 @@ def get_spotify_token() -> Dict:
     }
     url_args = urlencode(auth_query_parameters)
     auth_url = f"{SPOTIFY_AUTH_URL}/?{url_args}"
+
     print_step("Open the following URL in a browser and authorize the application:")
     print_info(auth_url)
-    try:
-        webbrowser.open(auth_url)
-    except Exception:
-        pass
+    _try_open_browser(auth_url)
 
     auth_code = input(
         "→ Paste the 'code' parameter from the redirect URL here: "
@@ -68,6 +199,30 @@ def get_spotify_token() -> Dict:
     return token_info
 
 
+def get_spotify_token(use_cli_auth: bool = False) -> Dict:
+    """
+    Get a new Spotify access/refresh token via authorization code flow.
+
+    If use_cli_auth is False (default):
+      - start a local HTTP server on SPOTIFY_REDIRECT_URI (localhost)
+      - open the browser to the Spotify auth URL
+      - capture the ?code=... automatically with the local server
+
+    If anything goes wrong with the local server flow, or if use_cli_auth=True,
+    we fall back to the classic CLI-based copy/paste flow.
+    """
+    if use_cli_auth:
+        return _get_spotify_token_cli()
+
+    try:
+        return _get_spotify_token_local_server()
+    except Exception as e:
+        print_warning(
+            f"Automatic browser authorization failed ({e}). Falling back to CLI flow."
+        )
+        return _get_spotify_token_cli()
+
+
 def refresh_spotify_token(refresh_token: str) -> Dict:
     token_data = {
         "grant_type": "refresh_token",
@@ -84,10 +239,16 @@ def refresh_spotify_token(refresh_token: str) -> Dict:
     return token_info
 
 
-def load_spotify_token() -> Dict:
+def load_spotify_token(use_cli_auth: bool = False) -> Dict:
+    """
+    Load Spotify token from cache, or perform auth flow if missing/expired.
+
+    If use_cli_auth=True, the initial auth will use the CLI copy/paste flow.
+    Otherwise, it will try the local HTTP server + browser flow first.
+    """
     token_info = read_json(SPOTIFY_TOKEN_FILE, default=None)
     if token_info is None:
-        token_info = get_spotify_token()
+        token_info = get_spotify_token(use_cli_auth=use_cli_auth)
 
     now = int(time.time())
     expires_in = token_info.get("expires_in", 3600)

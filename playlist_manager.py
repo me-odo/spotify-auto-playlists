@@ -197,3 +197,37 @@ def sync_playlists(
         print_info(f"  Duplicates to remove : {len(duplicates)}")
         print_info(f"  New tracks to add    : {len(new_to_add)}")
         print_step(f"Details in: {diff_path}")
+
+    # ---- Summary & confirmation ----
+    has_changes = any(diff["duplicates"] or diff["new_to_add"] for diff in diffs)
+    if not has_changes:
+        print_success("No changes detected. All playlists are already up to date.")
+        print_info("No Spotify operations are required.")
+        return
+
+    answer = input("Apply these incremental changes on Spotify? [Y/n] ").strip().lower()
+    if answer in ("n", "no"):
+        print_info("Changes cancelled. No playlists were modified.")
+        return
+
+    print_step("Applying incremental changes...")
+    for diff in diffs:
+        # Skip playlists that had no changes
+        if not diff["duplicates"] and not diff["new_to_add"]:
+            continue
+
+        name = diff["name"]
+        target_ids = diff["target_ids"]
+
+        playlist_obj = _find_playlist_by_name(playlists_existing, name)
+        if playlist_obj:
+            playlist_id = playlist_obj["id"]
+        else:
+            playlist_id = find_or_create_playlist(
+                token_info, user_id, name, playlists_existing
+            )
+
+        print_step(f"Updating playlist: {name}")
+        incremental_update_playlist(token_info, playlist_id, target_ids)
+
+    print_success("Playlists synchronized (incremental).")

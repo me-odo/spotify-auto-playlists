@@ -1,4 +1,3 @@
-import os
 from typing import Dict, List
 
 from config import CLASSIFICATION_CACHE_FILE
