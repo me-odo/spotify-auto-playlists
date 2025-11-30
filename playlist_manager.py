@@ -93,14 +93,21 @@ def sync_playlists(
     playlists_genre: Dict[str, List[str]],
     playlists_year: Dict[str, List[str]],
     track_map: Dict[str, Track],
-    prompt_yes_no: Callable[[str, bool], bool],
-) -> None:
+    apply_changes: bool | None = None,
+) -> list[Dict]:
     """
     Incremental sync with preview:
     - generate a .diff file per playlist WITH CHANGES in DIFF_DIR
     - remove existing duplicates
     - add only tracks that are not already present
     - do NOT remove tracks that are present but not in the target set
+
+    apply_changes:
+      - None  -> ask user in CLI (interactive)
+      - True  -> apply changes without asking
+      - False -> preview only, do NOT modify Spotify
+    Returns:
+      - list of diff dictionaries (one per target playlist)
     """
     # Merge all target playlists into a single dict
     target_playlists: Dict[str, List[str]] = {}
@@ -206,16 +213,24 @@ def sync_playlists(
     if not has_changes:
         print_success("No changes detected. All playlists are already up to date.")
         print_info("No Spotify operations are required.")
-        return
+        return diffs
 
-    # Global confirmation (via injected prompt function)
-    if not prompt_yes_no(
-        "Apply these incremental changes on Spotify?", default_yes=True
-    ):
-        print_info("Changes cancelled. No playlists were modified.")
-        return
+    # Decide whether to apply changes
+    if apply_changes is None:
+        # CLI / interactive mode
+        answer = (
+            input("Apply these incremental changes on Spotify? [Y/n] ").strip().lower()
+        )
+        if answer in ("n", "no"):
+            print_info("Changes cancelled. No playlists were modified.")
+            return diffs
+    elif apply_changes is False:
+        # Non-interactive: preview only
+        print_info("apply_changes=False → preview only. No playlists were modified.")
+        return diffs
+    # else: apply_changes is True → go ahead without asking
 
-    print_step("Applying incremental changes...")
+    print_step("Applying incremental changes on Spotify...")
     for diff in diffs:
         # Skip playlists that had no changes
         if not diff["duplicates"] and not diff["new_to_add"]:
@@ -232,7 +247,8 @@ def sync_playlists(
                 token_info, user_id, name, playlists_existing
             )
 
-        print_step(f"Updating playlist: {name}")
+        print_info(f"Incremental sync of playlist: {name}")
         incremental_update_playlist(token_info, playlist_id, target_ids)
 
     print_success("Playlists synchronized (incremental).")
+    return diffs
