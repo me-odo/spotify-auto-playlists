@@ -1,15 +1,55 @@
-from dataclasses import asdict
-from typing import List
+from typing import Dict, List
 
-from app.config import TRACKS_CACHE_FILE
-from app.core import Track, read_json, write_json
+from app.core.models import Classification, Track
+from app.data.cache import (
+    load_classification_cache as _load_classification_cache,
+)
+from app.data.cache import (
+    load_external_features_cache as _load_external_features_cache,
+)
+from app.data.cache import (
+    load_tracks_cache as _load_tracks_cache,
+)
+from app.data.cache import (
+    save_classification_cache as _save_classification_cache,
+)
+from app.data.cache import (
+    save_external_features_cache as _save_external_features_cache,
+)
+from app.data.cache import (
+    save_tracks_cache as _save_tracks_cache,
+)
 
 
 def load_tracks_cache() -> List[Track]:
-    data = read_json(TRACKS_CACHE_FILE, default=[])
-    return [Track(**item) for item in data]
+    return _load_tracks_cache()
 
 
 def save_tracks_cache(tracks: List[Track]) -> None:
-    data = [asdict(t) for t in tracks]
-    write_json(TRACKS_CACHE_FILE, data)
+    _save_tracks_cache(tracks)
+
+
+def load_external_features_cache() -> Dict[str, Dict]:
+    return _load_external_features_cache()
+
+
+def save_external_features_cache(cache: Dict[str, Dict]) -> None:
+    _save_external_features_cache(cache)
+
+
+def load_classification_cache() -> Dict[str, Classification]:
+    return _load_classification_cache()
+
+
+def save_classification_cache(classifications: Dict[str, Classification]) -> None:
+    _save_classification_cache(classifications)
+
+
+__all__ = [
+    "load_tracks_cache",
+    "save_tracks_cache",
+    "load_external_features_cache",
+    "save_external_features_cache",
+    "load_classification_cache",
+    "save_classification_cache",
+]

@@ -15,6 +15,14 @@ class Track:
 
 @dataclass
 class Classification:
+    """
+    Résultat de la classification d’un morceau.
+
+    - mood  : "chill", "workout", etc.
+    - genre : éventuellement un genre macro (facultatif)
+    - year  : année dominante (facultatif)
+    """
+
     mood: str
-    genre_macro: str
-    extra: Dict
+    genre: Optional[str] = None
+    year: Optional[int] = None

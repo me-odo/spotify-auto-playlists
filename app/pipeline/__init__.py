@@ -1,8 +1,16 @@
 from .cache_manager import load_tracks_cache, save_tracks_cache
-from .classifier import classify_tracks_rule_based
-from .external_features import enrich_tracks_with_external_features
+from .classifier import classify_tracks_rule_based, load_classification_cache
+from .external_features import (
+    enrich_tracks_with_external_features,
+    load_external_features_cache,
+)
 from .orchestration import PipelineOptions, run_pipeline, run_pipeline_entrypoint
-from .playlist_manager import build_target_playlists, sync_playlists
+from .playlist_manager import (
+    apply_target_playlists,
+    build_target_playlists,
+    preview_playlist_diffs,
+    sync_playlists,
+)
 from .reporting import write_unmatched_report
 
 __all__ = [
@@ -11,8 +19,12 @@ __all__ = [
     "run_pipeline_entrypoint",
     "build_target_playlists",
     "sync_playlists",
+    "preview_playlist_diffs",
+    "apply_target_playlists",
     "classify_tracks_rule_based",
     "enrich_tracks_with_external_features",
+    "load_classification_cache",
+    "load_external_features_cache",
     "load_tracks_cache",
     "save_tracks_cache",
     "write_unmatched_report",

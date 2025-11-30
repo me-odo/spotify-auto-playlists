@@ -3,15 +3,11 @@ from typing import Dict, List, Optional, Tuple
 
 import requests
 
-from app.config import EXTERNAL_FEATURES_CACHE_FILE, MUSICBRAINZ_USER_AGENT
-from app.core import (
-    Track,
-    log_info,
-    log_progress,
-    log_step,
-    log_warning,
-    read_json,
-    write_json,
+from app.config import MUSICBRAINZ_USER_AGENT
+from app.core import Track, log_info, log_progress, log_step
+from app.pipeline.cache_manager import (
+    load_external_features_cache,
+    save_external_features_cache,
 )
 
 MUSICBRAINZ_API_BASE = "https://musicbrainz.org/ws/2"
@@ -23,23 +19,11 @@ MB_HEADERS = {
 }
 
 
-def load_external_features_cache() -> Dict[str, Dict]:
-    def _on_error(e: Exception) -> None:
-        log_warning("External features cache file is corrupted; ignoring it.")
-
-    return read_json(EXTERNAL_FEATURES_CACHE_FILE, default={}, on_error=_on_error)
-
-
-def save_external_features_cache(cache: Dict[str, Dict]) -> None:
-    write_json(EXTERNAL_FEATURES_CACHE_FILE, cache)
-
-
 def _search_musicbrainz_recording(track: Track) -> Optional[str]:
     """
     Try to resolve a MusicBrainz recording MBID from track title + artist.
     Returns the MBID as a string or None if not found.
     """
-    # simple strategy: use first artist in the list
     main_artist = track.artist.split(",")[0].strip() if track.artist else ""
 
     if not track.name or not main_artist:
@@ -66,7 +50,6 @@ def _search_musicbrainz_recording(track: Track) -> Optional[str]:
         if not recordings:
             return None
 
-        # naive: take the first recording
         mbid = recordings[0].get("id")
         return mbid
     except Exception:
@@ -150,8 +133,6 @@ def _process_missing_external_features(
 
     log_info(f"{total_to_process} tracks to resolve externally.")
 
-    # Parallel execution: only network calls happen in threads.
-    # Cache updates happen in the main thread.
     processed = 0
     with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_track = {
@@ -170,10 +151,8 @@ def _process_missing_external_features(
                 continue
 
             if entry is None:
-                # Not found / no data for this track
                 continue
 
-            # Update in-memory cache + external_features from main thread only
             cache[track_id] = entry
             external_features[track_id] = entry
 
@@ -198,34 +177,29 @@ def enrich_tracks_with_external_features(
     force_refresh: bool = False,
 ) -> Tuple[Dict[str, Dict], List[Track]]:
     """
-    For each Track, try to get external features (mood/genre/etc.) via:
-      - MusicBrainz (recording search)
-      - AcousticBrainz (high-level data)
+    Pour chaque Track, essaie de récupérer des features externes (mood/genre/etc.)
+    via MusicBrainz + AcousticBrainz.
 
-    Caching logic:
-      - cache is keyed by Spotify track ID
-      - if force_refresh=False, we reuse cached entries and only call external APIs
-        for tracks that are missing in the cache
-      - cache is updated and saved to disk incrementally after each successful fetch
+    Caching :
+      - cache indexé par ID Spotify
+      - si force_refresh=False, on réutilise le cache et on ne fait des calls externes
+        que pour les morceaux manquants
+      - le cache est mis à jour au fur et à mesure
 
-    Parallelism:
-      - external lookups are done in parallel (ThreadPoolExecutor)
-      - shared state (cache, external_features) is only modified from the main thread,
-        based on worker results → no concurrent writes, no race conditions.
+    Retourne:
+      - external_features: dict[track_id] -> données externes
+      - unmatched_tracks: liste des tracks sans données externes
     """
     log_step("Fetching external mood/genre features (MusicBrainz + AcousticBrainz)...")
 
-    # Load existing cache from disk
     cache = load_external_features_cache()
 
-    # Use cached data when possible, and identify tracks that still need work
     external_features, to_process = _prepare_external_features_from_cache(
         tracks=tracks,
         cache=cache,
         force_refresh=force_refresh,
     )
 
-    # If nothing to process, we only rely on cache
     if not to_process:
         log_info(
             f"Using existing external features cache; "
@@ -234,14 +208,12 @@ def enrich_tracks_with_external_features(
         unmatched = _build_unmatched_tracks(tracks, external_features)
         return external_features, unmatched
 
-    # Resolve missing external features in parallel
     total_processed = _process_missing_external_features(
         to_process=to_process,
         cache=cache,
         external_features=external_features,
     )
 
-    # Final log: build unmatched list (tracks with no external data at all)
     unmatched = _build_unmatched_tracks(tracks, external_features)
 
     log_info(

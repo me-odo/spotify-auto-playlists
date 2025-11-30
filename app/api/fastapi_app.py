@@ -1,19 +1,29 @@
 from fastapi import FastAPI
 
-from app.core import configure_logging
-
-from .auth import router as auth_router
-from .pipeline import router as pipeline_router
+from app.api.auth.routes import router as auth_router
+from app.api.pipeline.classify import router as pipeline_classify_router
+from app.api.pipeline.diff import router as pipeline_diff_router
+from app.api.pipeline.external import router as pipeline_external_router
+from app.api.pipeline.health import router as pipeline_health_router
+from app.api.pipeline.playlists import router as pipeline_playlists_router
+from app.api.pipeline.tracks import router as pipeline_tracks_router
+from app.core.logging_config import configure_logging
 
 configure_logging()
 
 app = FastAPI(
     title="Spotify Auto-Playlists API",
-    version="0.2.0",
+    version="0.4.0",
     description="Backend API for mood-based Spotify auto playlists.",
 )
 
-# Routes regroupées
-app.include_router(pipeline_router, tags=["pipeline"])
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
+# Pipeline routes
+app.include_router(pipeline_health_router, prefix="/pipeline", tags=["pipeline"])
+app.include_router(pipeline_tracks_router, prefix="/pipeline", tags=["pipeline"])
+app.include_router(pipeline_external_router, prefix="/pipeline", tags=["pipeline"])
+app.include_router(pipeline_classify_router, prefix="/pipeline", tags=["pipeline"])
+app.include_router(pipeline_playlists_router, prefix="/pipeline", tags=["pipeline"])
+app.include_router(pipeline_diff_router, prefix="/pipeline", tags=["pipeline"])
+
+# Auth routes
 app.include_router(auth_router, prefix="/auth", tags=["auth"])

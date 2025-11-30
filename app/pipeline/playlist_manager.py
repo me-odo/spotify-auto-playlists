@@ -233,7 +233,6 @@ def sync_playlists(
       - Show a summary per playlist in the CLI.
 
     apply_changes:
-      - None  => interactive (CLI): ask the user for confirmation.
       - False => PREVIEW-ONLY: generate diffs, do NOT touch Spotify.
       - True  => apply changes directly on Spotify, without confirmation.
 
@@ -337,4 +336,90 @@ def sync_playlists(
 
     log_success("Playlists synchronized (incremental).")
     return diffs
+
+
+# ---------------------------------------------------------------------------
+# New helpers for API-based diff visualisation / apply
+# ---------------------------------------------------------------------------
+
+
+def preview_playlist_diffs(
+    token_info: Dict,
+    playlists_existing: List[Dict],
+    playlists_mood: Dict[str, List[str]],
+    playlists_genre: Dict[str, List[str]],
+    playlists_year: Dict[str, List[str]],
+) -> List[Dict[str, Any]]:
+    """
+    Compute diffs for all target playlists WITHOUT:
+      - writing .diff files
+      - applying any change on Spotify
+
+    This is intended for API usage (frontend diff visualisation).
+    """
+    target_playlists = _merge_target_playlists(
+        playlists_mood=playlists_mood,
+        playlists_genre=playlists_genre,
+        playlists_year=playlists_year,
+    )
+
+    if not target_playlists:
+        return []
+
+    diffs: List[Dict[str, Any]] = []
+    for name, target_ids in target_playlists.items():
+        diff_entry = _compute_playlist_diff(
+            name=name,
+            target_ids=target_ids,
+            playlists_existing=playlists_existing,
+            token_info=token_info,
+        )
+        diffs.append(diff_entry)
+
     return diffs
+
+
+def apply_target_playlists(
+    token_info: Dict,
+    user_id: str,
+    playlists_existing: List[Dict],
+    target_playlists: Dict[str, List[str]],
+) -> List[Dict[str, Any]]:
+    """
+    Apply a final, explicit mapping name -> target_ids to Spotify.
+
+    This is the function used by the /pipeline/apply endpoint, where the
+    frontend has already decided the final target content of each playlist.
+
+    It does NOT recompute diffs; it just ensures a playlist exists and then
+    calls incremental_update_playlist with the provided target_ids.
+    """
+    results: List[Dict[str, Any]] = []
+
+    for name, target_ids in target_playlists.items():
+        playlist_obj = _find_playlist_by_name(playlists_existing, name)
+        if playlist_obj:
+            playlist_id = playlist_obj["id"]
+        else:
+            playlist_id = find_or_create_playlist(
+                token_info,
+                user_id,
+                name,
+                playlists_existing,
+            )
+            # Important: keep local list in sync if we reuse it later
+            playlists_existing.append({"id": playlist_id, "name": name})
+
+        log_info(f"Applying target playlist for '{name}' ({len(target_ids)} tracks)...")
+        incremental_update_playlist(token_info, playlist_id, target_ids)
+
+        results.append(
+            {
+                "name": name,
+                "playlist_id": playlist_id,
+                "target_count": len(target_ids),
+            }
+        )
+
+    log_success(f"Applied {len(results)} target playlists to Spotify.")
+    return results
