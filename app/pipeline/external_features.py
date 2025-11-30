@@ -3,18 +3,18 @@ from typing import Dict, List, Tuple, Optional
 
 import requests
 
-from cli_utils import (
+from app.core.cli_utils import (
     print_step,
     print_info,
     print_warning,
     print_progress_bar,
 )
-from config import (
+from app.config import (
     EXTERNAL_FEATURES_CACHE_FILE,
     MUSICBRAINZ_USER_AGENT,
 )
-from fs_utils import write_json, read_json
-from models import Track
+from app.core.fs_utils import write_json, read_json
+from app.core.models import Track
 
 
 MUSICBRAINZ_API_BASE = "https://musicbrainz.org/ws/2"

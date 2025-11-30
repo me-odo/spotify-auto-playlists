@@ -1,9 +1,9 @@
 import os
 from typing import List
 
-from config import REPORTS_DIR
-from fs_utils import ensure_dir
-from models import Track
+from app.config import REPORTS_DIR
+from app.core.fs_utils import ensure_dir
+from app.core.models import Track
 
 
 def write_unmatched_report(unmatched_tracks: List[Track], filename: str) -> str:

@@ -44,28 +44,18 @@ def print_progress_bar(
     length: int = 30,
 ) -> None:
     """
-    Simple progress bar in the terminal.
+    Simple progress bar in the terminal (CLI only).
 
-    - In CLI mode: uses a single-line bar with carriage return (\r).
-    - In GUI mode: prints a simple "current/total (xx.x%)" line,
-      because carriage returns do not work nicely in a Text widget.
+    Example:
+      print_progress_bar(10, 100, prefix="  Fetching")
     """
     if total <= 0:
         total = 1
 
     fraction = max(0.0, min(1.0, current / total))
-    percent = fraction * 100
-
-    # If we're in GUI mode (stdout replaced by our TextRedirector), we avoid \r
-    if getattr(sys.stdout, "is_gui", False):
-        line = f"{prefix} {current}/{total} ({percent:5.1f}%)\n"
-        sys.stdout.write(line)
-        sys.stdout.flush()
-        return
-
-    # Classic CLI progress bar with carriage return
     filled_length = int(length * fraction)
     bar = "#" * filled_length + "-" * (length - filled_length)
+    percent = fraction * 100
     line = f"\r{prefix} [{bar}] {percent:5.1f}%"
     sys.stdout.write(line)
     sys.stdout.flush()

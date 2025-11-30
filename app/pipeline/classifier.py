@@ -1,13 +1,13 @@
 from typing import Dict, List
 
-from config import CLASSIFICATION_CACHE_FILE
-from cli_utils import (
+from app.config import CLASSIFICATION_CACHE_FILE
+from app.core.cli_utils import (
     print_info,
     print_step,
     print_progress_bar,
 )
-from fs_utils import write_json, read_json
-from models import Track, Classification
+from app.core.fs_utils import write_json, read_json
+from app.core.models import Track, Classification
 
 
 def load_classification_cache() -> Dict[str, Dict]:

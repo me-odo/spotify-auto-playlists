@@ -1,9 +1,9 @@
 from dataclasses import asdict
 from typing import List
 
-from config import TRACKS_CACHE_FILE
-from fs_utils import write_json, read_json
-from models import Track
+from app.config import TRACKS_CACHE_FILE
+from app.core.fs_utils import write_json, read_json
+from app.core.models import Track
 
 
 def load_tracks_cache() -> List[Track]:

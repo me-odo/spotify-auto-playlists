@@ -3,7 +3,7 @@ from typing import Any, Dict
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from api_backend import PipelineOptions, run_pipeline
+from app.pipeline.orchestration import PipelineOptions, run_pipeline
 
 app = FastAPI(
     title="Spotify Auto-Playlists API",
@@ -17,7 +17,6 @@ class RunRequest(BaseModel):
     force_external_refresh: bool = False
     refresh_classification: bool = False
     apply_changes: bool = False  # False = preview only, True = write to Spotify
-    use_cli_auth: bool = False  # True = force old copy/paste auth flow
 
 
 @app.get("/health")
@@ -36,11 +35,9 @@ def run(req: RunRequest) -> Dict[str, Any]:
       "force_external_refresh": false,
       "refresh_classification": false,
       "apply_changes": false,
-      "use_cli_auth": false
     }
     """
     opts = PipelineOptions(
-        use_cli_auth=req.use_cli_auth,
         refresh_tracks=req.refresh_tracks,
         force_external_refresh=req.force_external_refresh,
         refresh_classification=req.refresh_classification,
