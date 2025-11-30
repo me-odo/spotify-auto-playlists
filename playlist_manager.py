@@ -1,6 +1,6 @@
 from collections import Counter
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Callable
 
 from config import DIFF_DIR, PLAYLIST_PREFIX_MOOD
 from cli_utils import (
@@ -93,6 +93,7 @@ def sync_playlists(
     playlists_genre: Dict[str, List[str]],
     playlists_year: Dict[str, List[str]],
     track_map: Dict[str, Track],
+    prompt_yes_no: Callable[[str, bool], bool],
 ) -> None:
     """
     Incremental sync with preview:
@@ -199,14 +200,18 @@ def sync_playlists(
         print_step(f"Details in: {diff_path}")
 
     # ---- Summary & confirmation ----
+    # Check if ANY playlist actually needs changes
     has_changes = any(diff["duplicates"] or diff["new_to_add"] for diff in diffs)
+
     if not has_changes:
         print_success("No changes detected. All playlists are already up to date.")
         print_info("No Spotify operations are required.")
         return
 
-    answer = input("Apply these incremental changes on Spotify? [Y/n] ").strip().lower()
-    if answer in ("n", "no"):
+    # Global confirmation (via injected prompt function)
+    if not prompt_yes_no(
+        "Apply these incremental changes on Spotify?", default_yes=True
+    ):
         print_info("Changes cancelled. No playlists were modified.")
         return
 

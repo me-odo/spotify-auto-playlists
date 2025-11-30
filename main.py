@@ -1,4 +1,6 @@
 import sys
+from typing import Callable
+
 
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 from spotify_client import (
@@ -28,8 +30,24 @@ from models import Track
 from playlist_manager import build_target_playlists, sync_playlists
 from reporting import write_unmatched_report
 
+# A function that asks a yes/no question and returns True for "yes", False for "no"
+PromptFn = Callable[[str, bool], bool]
 
-def get_tracks_with_cache(token_info) -> list[Track]:
+
+def prompt_yes_no_cli(message: str, default_yes: bool = True) -> bool:
+    """
+    CLI implementation of a yes/no prompt.
+    - message: question to display
+    - default_yes: what to assume if user just presses Enter
+    """
+    default_label = "Y/n" if default_yes else "y/N"
+    answer = input(f"→ {message} [{default_label}] ").strip().lower()
+    if not answer:
+        return default_yes
+    return answer in ("y", "yes")
+
+
+def get_tracks_with_cache(token_info, prompt_yes_no: PromptFn) -> list[Track]:
     """
     Returns tracks (list of Track).
     Uses local cache and optionally refreshes from Spotify.
@@ -37,10 +55,10 @@ def get_tracks_with_cache(token_info) -> list[Track]:
     cached_tracks = load_tracks_cache()
     if cached_tracks:
         print_info(f"Found {len(cached_tracks)} tracks in local cache.")
-        answer = (
-            input("→ Do you want to refresh them from Spotify? [Y/n] ").strip().lower()
+        do_refresh = prompt_yes_no(
+            "Do you want to refresh them from Spotify?", default_yes=False
         )
-        if answer in ("n", "no"):
+        if not do_refresh:
             print_step("Using local cached tracks (no Spotify request).")
             return cached_tracks
         print_step("Refreshing tracks from Spotify...")
@@ -50,7 +68,7 @@ def get_tracks_with_cache(token_info) -> list[Track]:
     return tracks
 
 
-def ask_refresh_classification_decision() -> bool:
+def ask_refresh_classification_decision(prompt_yes_no: PromptFn) -> bool:
     """
     Look at local classification cache.
     If entries exist, ask user whether to refresh them.
@@ -62,15 +80,12 @@ def ask_refresh_classification_decision() -> bool:
 
     count = len(cache)
     print_info(f"Found {count} tracks in local classification cache.")
-    answer = (
-        input(
-            "→ Do you want to recompute ALL classifications from scratch (ignore cache)? [Y/n] "
-        )
-        .strip()
-        .lower()
+    do_refresh = prompt_yes_no(
+        "Do you want to recompute ALL classifications from scratch (ignore cache)?",
+        default_yes=False,
     )
 
-    if answer in ("n", "no"):
+    if not do_refresh:
         print_step(
             "Keeping existing classifications; only new tracks will be classified."
         )
@@ -80,7 +95,17 @@ def ask_refresh_classification_decision() -> bool:
     return True
 
 
-def main(use_cli_auth: bool = False) -> None:
+def run_pipeline(prompt_yes_no: PromptFn, use_cli_auth: bool = False) -> None:
+    """
+    Core pipeline:
+      - auth Spotify
+      - fetch playlists & liked tracks (with cache)
+      - fetch external features
+      - classification
+      - build target playlists
+      - preview + sync with Spotify
+    The prompt_yes_no function is used for all interactive decisions (CLI or GUI).
+    """
     # 0) Basic config check
     if not (SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET):
         print_error(
@@ -102,7 +127,7 @@ def main(use_cli_auth: bool = False) -> None:
 
     # 2) Liked tracks with local cache
     print_header("Liked tracks")
-    tracks = get_tracks_with_cache(token_info)
+    tracks = get_tracks_with_cache(token_info, prompt_yes_no=prompt_yes_no)
 
     # 3) External mood/genre features (MusicBrainz + AcousticBrainz)
     print_header("External mood/genre features")
@@ -124,7 +149,7 @@ def main(use_cli_auth: bool = False) -> None:
 
     # 5) Classification (rule-based)
     print_header("Classification")
-    refresh_classification = ask_refresh_classification_decision()
+    refresh_classification = ask_refresh_classification_decision(prompt_yes_no)
     classifications = classify_tracks_rule_based(
         tracks=tracks,
         external_features=external_features,
@@ -149,9 +174,14 @@ def main(use_cli_auth: bool = False) -> None:
         playlists_genre=playlists_genre,
         playlists_year=playlists_year,
         track_map=track_map,
+        prompt_yes_no=prompt_yes_no,
     )
 
     print_success("Synchronization complete!")
+
+
+def main(use_cli_auth: bool = False) -> None:
+    run_pipeline(prompt_yes_no_cli, use_cli_auth=use_cli_auth)
 
 
 if __name__ == "__main__":
