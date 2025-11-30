@@ -85,6 +85,131 @@ def _safe_filename(name: str) -> str:
     return "".join(cleaned)
 
 
+def _merge_target_playlists(
+    playlists_mood: Dict[str, List[str]],
+    playlists_genre: Dict[str, List[str]],
+    playlists_year: Dict[str, List[str]],
+) -> Dict[str, List[str]]:
+    """
+    Merge mood/genre/year target playlists into a single mapping.
+
+    The merge preserves the order of track IDs and avoids duplicates
+    within each playlist.
+    """
+    target_playlists: Dict[str, List[str]] = {}
+    for source in (playlists_mood, playlists_genre, playlists_year):
+        for name, ids in source.items():
+            bucket = target_playlists.setdefault(name, [])
+            for tid in ids:
+                if tid not in bucket:
+                    bucket.append(tid)
+    return target_playlists
+
+
+def _compute_playlist_diff(
+    name: str,
+    target_ids: List[str],
+    playlists_existing: List[Dict],
+    token_info: Dict,
+) -> Dict[str, Any]:
+    """
+    Compute the diff information for a single playlist name.
+
+    Returns a dict compatible with the structure documented in sync_playlists().
+    """
+    playlist_obj = _find_playlist_by_name(playlists_existing, name)
+    if playlist_obj:
+        playlist_id = playlist_obj["id"]
+        existing_ids = get_playlist_tracks(token_info, playlist_id)
+    else:
+        playlist_id = None
+        existing_ids = []
+
+    counts = Counter(existing_ids)
+    duplicates = [tid for tid, c in counts.items() if c > 1]
+
+    existing_set = set(existing_ids)
+    target_set = set(target_ids)
+    new_to_add = list(target_set - existing_set)
+
+    return {
+        "name": name,
+        "playlist_id": playlist_id,
+        "existing_ids": existing_ids,
+        "target_ids": target_ids,
+        "duplicates": duplicates,
+        "new_to_add": new_to_add,
+    }
+
+
+def _format_track_line(track_map: Dict[str, Track], prefix: str, tid: str) -> str:
+    """
+    Human-readable representation of a track line in a diff file.
+    """
+    track = track_map.get(tid)
+    if track:
+        return f"{prefix} {track.artist} – {track.name} [{tid}]"
+    return f"{prefix} {tid}"
+
+
+def _write_diff_file(
+    diff_entry: Dict[str, Any],
+    track_map: Dict[str, Track],
+) -> str:
+    """
+    Write the .diff file for a single playlist and return the file path.
+    """
+    name = diff_entry["name"]
+    playlist_id = diff_entry["playlist_id"]
+    existing_ids = diff_entry["existing_ids"]
+    target_ids = diff_entry["target_ids"]
+    duplicates = diff_entry["duplicates"]
+    new_to_add = diff_entry["new_to_add"]
+
+    safe_name = _safe_filename(name)
+    diff_path = os.path.join(DIFF_DIR, f"{safe_name}.diff")
+
+    target_set = set(target_ids)
+
+    with open(diff_path, "w", encoding="utf-8") as f:
+        f.write(f"Playlist: {name}\n")
+        f.write(f"Playlist ID: {playlist_id or '(will be created)'}\n\n")
+        f.write(f"Current        : {len(existing_ids)} tracks\n")
+        f.write(f"Target (unique): {len(target_set)} tracks\n")
+        f.write(f"Duplicates to remove : {len(duplicates)}\n")
+        f.write(f"New tracks to add    : {len(new_to_add)}\n")
+        f.write("Tracks already present and not duplicated will be kept.\n\n")
+
+        f.write("=== Duplicates to remove (d) ===\n")
+        if duplicates:
+            for tid in duplicates:
+                f.write(_format_track_line(track_map, "d", tid) + "\n")
+        else:
+            f.write("(no duplicates)\n")
+        f.write("\n")
+
+        f.write("=== New tracks to add (+) ===\n")
+        if new_to_add:
+            for tid in new_to_add:
+                f.write(_format_track_line(track_map, "+", tid) + "\n")
+        else:
+            f.write("(no new tracks to add)\n")
+
+    return diff_path
+
+
+def _should_apply_changes(apply_changes: bool) -> bool:
+    """
+    Decide whether playlist changes should be applied to Spotify.
+
+    Returns True if the operation should proceed, False if it should be a preview only.
+    """
+    if not apply_changes:
+        print_info("Preview mode: no changes will be applied to Spotify.")
+        return False
+    return True
+
+
 def sync_playlists(
     token_info: Dict,
     user_id: str,
@@ -93,7 +218,7 @@ def sync_playlists(
     playlists_genre: Dict[str, List[str]],
     playlists_year: Dict[str, List[str]],
     track_map: Dict[str, Track],
-    apply_changes: Optional[bool] = None,
+    apply_changes: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Incrementally sync target playlists to Spotify, with a diff preview.
@@ -122,14 +247,12 @@ def sync_playlists(
           "new_to_add": List[str],
         }
     """
-    # Merge all target sources into a single dict
-    target_playlists: Dict[str, List[str]] = {}
-    for d in (playlists_mood, playlists_genre, playlists_year):
-        for name, ids in d.items():
-            target_playlists.setdefault(name, [])
-            for tid in ids:
-                if tid not in target_playlists[name]:
-                    target_playlists[name].append(tid)
+    # 1) Merge all target sources into a single dict
+    target_playlists = _merge_target_playlists(
+        playlists_mood=playlists_mood,
+        playlists_genre=playlists_genre,
+        playlists_year=playlists_year,
+    )
 
     if not target_playlists:
         print_info("No target playlists to sync.")
@@ -145,74 +268,30 @@ def sync_playlists(
 
     total_playlists = len(target_playlists)
 
+    # 2) Build diff entries and write .diff files when there are changes
     for idx, (name, target_ids) in enumerate(target_playlists.items(), start=1):
         print_info(f"[{idx}/{total_playlists}] Playlist: {name}")
 
-        playlist_obj = _find_playlist_by_name(playlists_existing, name)
-        if playlist_obj:
-            playlist_id = playlist_obj["id"]
-            existing_ids = get_playlist_tracks(token_info, playlist_id)
-        else:
-            playlist_id = None
-            existing_ids = []
-
-        counts = Counter(existing_ids)
-        duplicates = [tid for tid, c in counts.items() if c > 1]
-
-        existing_set = set(existing_ids)
-        target_set = set(target_ids)
-
-        new_to_add = list(target_set - existing_set)
-
-        # Store diff info (used later to detect if ANY change exists)
-        diff_entry: Dict[str, Any] = {
-            "name": name,
-            "playlist_id": playlist_id,
-            "existing_ids": existing_ids,
-            "target_ids": target_ids,
-            "duplicates": duplicates,
-            "new_to_add": new_to_add,
-        }
+        diff_entry = _compute_playlist_diff(
+            name=name,
+            target_ids=target_ids,
+            playlists_existing=playlists_existing,
+            token_info=token_info,
+        )
         diffs.append(diff_entry)
+
+        duplicates = diff_entry["duplicates"]
+        new_to_add = diff_entry["new_to_add"]
 
         # If nothing changes for this playlist, no diff file, minimal log
         if not duplicates and not new_to_add:
             print_info("  No changes for this playlist (already up to date).")
             continue
 
-        # ----- Generate .diff file only if there are changes -----
-        safe_name = _safe_filename(name)
-        diff_path = os.path.join(DIFF_DIR, f"{safe_name}.diff")
+        diff_path = _write_diff_file(diff_entry, track_map)
 
-        def fmt_track_line(prefix: str, tid: str) -> str:
-            t = track_map.get(tid)
-            if t:
-                return f"{prefix} {t.artist} – {t.name} [{tid}]"
-            return f"{prefix} {tid}"
-
-        with open(diff_path, "w", encoding="utf-8") as f:
-            f.write(f"Playlist: {name}\n")
-            f.write(f"Playlist ID: {playlist_id or '(will be created)'}\n\n")
-            f.write(f"Current        : {len(existing_ids)} tracks\n")
-            f.write(f"Target (unique): {len(target_set)} tracks\n")
-            f.write(f"Duplicates to remove : {len(duplicates)}\n")
-            f.write(f"New tracks to add    : {len(new_to_add)}\n")
-            f.write("Tracks already present and not duplicated will be kept.\n\n")
-
-            f.write("=== Duplicates to remove (d) ===\n")
-            if duplicates:
-                for tid in duplicates:
-                    f.write(fmt_track_line("d", tid) + "\n")
-            else:
-                f.write("(no duplicates)\n")
-            f.write("\n")
-
-            f.write("=== New tracks to add (+) ===\n")
-            if new_to_add:
-                for tid in new_to_add:
-                    f.write(fmt_track_line("+", tid) + "\n")
-            else:
-                f.write("(no new tracks to add)\n")
+        existing_ids = diff_entry["existing_ids"]
+        target_set = set(diff_entry["target_ids"])
 
         print_info(f"  Current        : {len(existing_ids)} tracks")
         print_info(f"  Target (unique): {len(target_set)} tracks")
@@ -220,7 +299,7 @@ def sync_playlists(
         print_info(f"  New tracks to add    : {len(new_to_add)}")
         print_step(f"Diff written to: {diff_path}\n")
 
-    # Check if ANY playlist actually needs changes
+    # 3) Check if ANY playlist actually needs changes
     has_changes = any(d["duplicates"] or d["new_to_add"] for d in diffs)
 
     if not has_changes:
@@ -228,21 +307,11 @@ def sync_playlists(
         print_info("No Spotify operations are required.")
         return diffs
 
-    # If apply_changes is False => preview only, do not touch Spotify
-    if apply_changes is False:
-        print_info("Preview mode: no changes will be applied to Spotify.")
+    # 4) Decide whether to apply changes (preview or actual update)
+    if not _should_apply_changes(apply_changes):
         return diffs
 
-    # If apply_changes is None => interactive CLI: ask user
-    if apply_changes is None:
-        answer = (
-            input("Apply these incremental changes on Spotify? [Y/n] ").strip().lower()
-        )
-        if answer in ("n", "no"):
-            print_info("Changes cancelled. No playlists were modified.")
-            return diffs
-
-    # Either apply_changes is True, or user confirmed
+    # 5) Either apply_changes is True, or user confirmed
     print_step("Applying incremental changes to Spotify...")
 
     for diff in diffs:
@@ -260,7 +329,7 @@ def sync_playlists(
             playlist_id = find_or_create_playlist(
                 token_info, user_id, name, playlists_existing
             )
-            diff["playlist_id"] = playlist_id  # mettre à jour l'info dans le diff
+            diff["playlist_id"] = playlist_id  # keep info in sync with reality
 
         print_info(f"  Incremental sync of playlist: {name}")
         incremental_update_playlist(token_info, playlist_id, target_ids)

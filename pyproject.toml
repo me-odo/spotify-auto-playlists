@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spotify-auto-playlists"
+version = "0.1.0"
+description = "Backend API for mood-based Spotify auto playlists."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "me-odo" }
+]
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "python-dotenv",
+  "requests",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black",
+  "ruff",
+  "mypy",
+  "pytest",
+]
+
+[tool.setuptools]
+packages = ["app"]

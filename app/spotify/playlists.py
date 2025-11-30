@@ -88,20 +88,14 @@ def get_playlist_tracks(token_info: Dict, playlist_id: str) -> List[str]:
     return track_ids
 
 
-def set_playlist_tracks(
-    token_info: Dict, playlist_id: str, track_ids: List[str]
-) -> None:
+def _fetch_all_playlist_item_uris(token_info: Dict, playlist_id: str) -> List[str]:
     """
-    Replace playlist contents with a given set of tracks.
-    - Remove all existing tracks in batches of 100.
-    - Add new tracks (deduplicated) in batches of 100.
+    Fetch all track URIs currently in a playlist.
     """
     headers = spotify_headers(token_info)
-
-    # 1) Fetch all current items
     url_items = f"{SPOTIFY_API_BASE}/playlists/{playlist_id}/tracks"
     params = {"fields": "items(track(uri)),next"}
-    uris_to_remove: List[str] = []
+    uris: List[str] = []
 
     while url_items:
         r = requests.get(url_items, headers=headers, params=params)
@@ -110,37 +104,140 @@ def set_playlist_tracks(
         for item in data.get("items", []):
             track = item.get("track")
             if track and track.get("uri"):
-                uris_to_remove.append(track["uri"])
+                uris.append(track["uri"])
         url_items = data.get("next")
         params = None  # next URL already includes params
 
-    # 2) Remove all existing tracks in batches of 100
+    return uris
+
+
+def _remove_tracks_by_uri(
+    token_info: Dict,
+    playlist_id: str,
+    uris: List[str],
+) -> None:
+    """
+    Remove all given track URIs from a playlist in batches of 100.
+    """
+    if not uris:
+        return
+
+    headers = spotify_headers(token_info)
     url_remove = f"{SPOTIFY_API_BASE}/playlists/{playlist_id}/tracks"
-    while uris_to_remove:
-        batch = uris_to_remove[:100]
-        uris_to_remove = uris_to_remove[100:]
+
+    remaining = list(uris)
+    while remaining:
+        batch = remaining[:100]
+        remaining = remaining[100:]
         body = {"tracks": [{"uri": u} for u in batch]}
         r = requests.delete(url_remove, headers=headers, json=body)
         r.raise_for_status()
 
-    # 3) Deduplicate track_ids while preserving order
+
+def _deduplicate_track_ids(track_ids: List[str]) -> List[str]:
+    """
+    Deduplicate track IDs while preserving their original order.
+    """
     seen = set()
     unique_ids: List[str] = []
     for tid in track_ids:
         if tid and tid not in seen:
             seen.add(tid)
             unique_ids.append(tid)
+    return unique_ids
 
-    if not unique_ids:
+
+def _add_tracks_by_ids(
+    token_info: Dict,
+    playlist_id: str,
+    track_ids: List[str],
+) -> None:
+    """
+    Add the given track IDs to a playlist in batches of 100.
+    """
+    if not track_ids:
         return
 
-    # 4) Add new tracks in batches of 100
-    uris = [f"spotify:track:{tid}" for tid in unique_ids]
+    headers = spotify_headers(token_info)
+    uris = [f"spotify:track:{tid}" for tid in track_ids]
     url_add = f"{SPOTIFY_API_BASE}/playlists/{playlist_id}/tracks"
+
     for i in range(0, len(uris), 100):
         batch = uris[i : i + 100]
         r = requests.post(url_add, headers=headers, json={"uris": batch})
         r.raise_for_status()
+
+
+def set_playlist_tracks(
+    token_info: Dict, playlist_id: str, track_ids: List[str]
+) -> None:
+    """
+    Replace playlist contents with a given set of tracks.
+    - Remove all existing tracks in batches of 100.
+    - Add new tracks (deduplicated) in batches of 100.
+    """
+    # 1) Fetch and remove all existing tracks
+    uris_to_remove = _fetch_all_playlist_item_uris(token_info, playlist_id)
+    _remove_tracks_by_uri(token_info, playlist_id, uris_to_remove)
+
+    # 2) Deduplicate incoming IDs and add them
+    unique_ids = _deduplicate_track_ids(track_ids)
+    if not unique_ids:
+        return
+
+    _add_tracks_by_ids(token_info, playlist_id, unique_ids)
+
+
+def _get_existing_ids_and_duplicates(
+    token_info: Dict,
+    playlist_id: str,
+) -> tuple[List[str], List[str]]:
+    """
+    Fetch current playlist track IDs and detect duplicates.
+    """
+    existing_ids = get_playlist_tracks(token_info, playlist_id)
+    counts = Counter(existing_ids)
+    duplicates = [tid for tid, c in counts.items() if c > 1]
+    return existing_ids, duplicates
+
+
+def _remove_duplicate_tracks_fully(
+    token_info: Dict,
+    playlist_id: str,
+    duplicates: List[str],
+) -> None:
+    """
+    Remove all duplicated tracks from a playlist, if any.
+    """
+    if not duplicates:
+        return
+
+    headers = spotify_headers(token_info)
+    url_remove = f"{SPOTIFY_API_BASE}/playlists/{playlist_id}/tracks"
+    tracks_to_remove = [{"uri": f"spotify:track:{tid}"} for tid in duplicates]
+
+    # Remove in batches of 100
+    remaining = tracks_to_remove
+    while remaining:
+        batch = remaining[:100]
+        remaining = remaining[100:]
+        r = requests.delete(url_remove, headers=headers, json={"tracks": batch})
+        r.raise_for_status()
+
+    print_info(f"Removed {len(duplicates)} duplicated tracks from playlist.")
+
+
+def _compute_tracks_to_add(
+    existing_ids: List[str],
+    target_ids: List[str],
+    duplicates: List[str],
+) -> List[str]:
+    """
+    Compute which track IDs should be added to reach the target playlist state.
+    """
+    existing_set = set(existing_ids) - set(duplicates)
+    target_set = set(target_ids)
+    return list(target_set - existing_set)
 
 
 def incremental_update_playlist(
@@ -153,45 +250,31 @@ def incremental_update_playlist(
 
     ⚠ Does NOT remove tracks that are present but not in target_ids.
     """
-    headers = spotify_headers(token_info)
+    # 1) Fetch current playlist state and detect duplicates
+    existing_ids, duplicates = _get_existing_ids_and_duplicates(
+        token_info=token_info,
+        playlist_id=playlist_id,
+    )
 
-    # 1) Fetch current playlist state
-    existing_ids = get_playlist_tracks(token_info, playlist_id)
-    counts = Counter(existing_ids)
+    # 2) Remove duplicated tracks entirely
+    _remove_duplicate_tracks_fully(
+        token_info=token_info,
+        playlist_id=playlist_id,
+        duplicates=duplicates,
+    )
 
-    # 2) Detect duplicates (tracks with count > 1)
-    duplicates = [tid for tid, c in counts.items() if c > 1]
-
-    # 3) Remove duplicated tracks entirely
-    if duplicates:
-        url_remove = f"{SPOTIFY_API_BASE}/playlists/{playlist_id}/tracks"
-        tracks_to_remove = [{"uri": f"spotify:track:{tid}"} for tid in duplicates]
-        # Remove in batches of 100
-        while tracks_to_remove:
-            batch = tracks_to_remove[:100]
-            tracks_to_remove = tracks_to_remove[100:]
-            r = requests.delete(url_remove, headers=headers, json={"tracks": batch})
-            r.raise_for_status()
-
-        print_info(f"Removed {len(duplicates)} duplicated tracks from playlist.")
-
-    # 4) Recompute conceptual state after duplicate removal
-    existing_set = set(existing_ids) - set(duplicates)
-    target_set = set(target_ids)
-
-    # 5) Tracks to add = those in target but not already present
-    to_add = list(target_set - existing_set)
+    # 3) Compute which tracks need to be added
+    to_add = _compute_tracks_to_add(
+        existing_ids=existing_ids,
+        target_ids=target_ids,
+        duplicates=duplicates,
+    )
 
     if not to_add:
         print_info("Playlist already up to date (no new tracks to add).")
         return
 
-    # 6) Add new tracks
-    uris = [f"spotify:track:{tid}" for tid in to_add]
-    url_add = f"{SPOTIFY_API_BASE}/playlists/{playlist_id}/tracks"
-    for i in range(0, len(uris), 100):
-        batch = uris[i : i + 100]
-        r = requests.post(url_add, headers=headers, json={"uris": batch})
-        r.raise_for_status()
+    # 4) Add new tracks
+    _add_tracks_by_ids(token_info, playlist_id, to_add)
 
     print_info(f"Added {len(to_add)} new tracks to playlist.")

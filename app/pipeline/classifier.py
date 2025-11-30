@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.config import CLASSIFICATION_CACHE_FILE
 from app.core.cli_utils import (
@@ -72,6 +72,85 @@ def _infer_mood_from_highlevel(highlevel: Dict) -> str:
     return "unclassified"
 
 
+def _make_classification_from_cache(entry: Dict) -> Classification:
+    """
+    Build a Classification instance from a cached dict entry.
+    """
+    return Classification(
+        mood=entry.get("mood", "unclassified"),
+        genre_macro=entry.get("genre_macro", "all"),
+        extra=entry.get("extra", {}),
+    )
+
+
+def _compute_fresh_classification(
+    track: Track,
+    external_features: Dict[str, Dict],
+) -> Classification:
+    """
+    Compute a new Classification for a track using external features.
+    """
+    features_entry = external_features.get(track.id)
+    if features_entry and isinstance(features_entry, dict):
+        highlevel = features_entry.get("highlevel", {})
+        mood = _infer_mood_from_highlevel(highlevel)
+        has_external = True
+    else:
+        mood = "unclassified"
+        has_external = False
+
+    return Classification(
+        mood=mood,
+        genre_macro="all",
+        extra={
+            "source": "rule_based_acousticbrainz",
+            "has_external_features": has_external,
+        },
+    )
+
+
+def _classify_single_track(
+    track: Track,
+    external_features: Dict[str, Dict],
+    cache: Dict[str, Dict],
+    refresh_existing: bool,
+) -> Optional[Classification]:
+    """
+    Classify a single track, optionally using or updating the cache.
+
+    Returns:
+      - Classification instance if the track has an ID
+      - None if the track has no ID
+    """
+    if not track.id:
+        return None
+
+    if not refresh_existing and track.id in cache:
+        return _make_classification_from_cache(cache[track.id])
+
+    classification = _compute_fresh_classification(track, external_features)
+    cache[track.id] = {
+        "mood": classification.mood,
+        "genre_macro": classification.genre_macro,
+        "extra": classification.extra,
+    }
+    return classification
+
+
+def _log_mood_summary(classifications: Dict[str, Classification]) -> None:
+    """
+    Print a small summary of the number of tracks per mood.
+    """
+    mood_counts: Dict[str, int] = {}
+    for c in classifications.values():
+        mood_counts[c.mood] = mood_counts.get(c.mood, 0) + 1
+
+    print_info("Classification done.")
+    print_info("Tracks per mood:")
+    for mood, count in sorted(mood_counts.items(), key=lambda x: x[0]):
+        print_info(f"    {mood}: {count}")
+
+
 def classify_tracks_rule_based(
     tracks: List[Track],
     external_features: Dict[str, Dict],
@@ -96,58 +175,22 @@ def classify_tracks_rule_based(
 
     print_step("Classifying tracks (rule-based mood model)...")
 
-    for idx, t in enumerate(tracks, start=1):
-        if not t.id:
+    for idx, track in enumerate(tracks, start=1):
+        classification = _classify_single_track(
+            track=track,
+            external_features=external_features,
+            cache=cache,
+            refresh_existing=refresh_existing,
+        )
+        if classification is None or not track.id:
             continue
 
-        # 1) If not refreshing and we have a cached classification, reuse it
-        if not refresh_existing and t.id in cache:
-            c_dict = cache[t.id]
-            classifications[t.id] = Classification(
-                mood=c_dict.get("mood", "unclassified"),
-                genre_macro=c_dict.get("genre_macro", "all"),
-                extra=c_dict.get("extra", {}),
-            )
-        else:
-            # 2) Compute new classification
-            features_entry = external_features.get(t.id)
-            if features_entry and isinstance(features_entry, dict):
-                highlevel = features_entry.get("highlevel", {})
-                mood = _infer_mood_from_highlevel(highlevel)
-                has_external = True
-            else:
-                mood = "unclassified"
-                highlevel = {}
-                has_external = False
-
-            c = Classification(
-                mood=mood,
-                genre_macro="all",
-                extra={
-                    "source": "rule_based_acousticbrainz",
-                    "has_external_features": has_external,
-                },
-            )
-            classifications[t.id] = c
-            cache[t.id] = {
-                "mood": c.mood,
-                "genre_macro": c.genre_macro,
-                "extra": c.extra,
-            }
+        classifications[track.id] = classification
 
         if total > 0:
             print_progress_bar(idx, total, prefix="  Classifying")
 
     save_classification_cache(cache)
-
-    # Optional: small summary per mood
-    mood_counts: Dict[str, int] = {}
-    for c in classifications.values():
-        mood_counts[c.mood] = mood_counts.get(c.mood, 0) + 1
-
-    print_info("Classification done.")
-    print_info("Tracks per mood:")
-    for mood, count in sorted(mood_counts.items(), key=lambda x: x[0]):
-        print_info(f"    {mood}: {count}")
+    _log_mood_summary(classifications)
 
     return classifications

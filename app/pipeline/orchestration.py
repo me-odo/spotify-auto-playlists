@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from app.pipeline.cache_manager import load_tracks_cache, save_tracks_cache
 from app.pipeline.classifier import (
@@ -7,6 +7,7 @@ from app.pipeline.classifier import (
 )
 from app.pipeline.external_features import enrich_tracks_with_external_features
 from app.pipeline.playlist_manager import build_target_playlists, sync_playlists
+from app.pipeline.reporting import write_unmatched_report
 from app.spotify.auth import load_spotify_token, get_current_user_id
 from app.spotify.tracks import get_all_liked_tracks
 from app.spotify.playlists import get_user_playlists
@@ -25,10 +26,9 @@ class PipelineOptions:
     force_external_refresh: bool = False
     refresh_classification: bool = False
     # apply_changes:
-    #   - True  => appliquer directement sur Spotify
-    #   - False => PREVIEW uniquement (pas d'écriture)
-    #   - None  => mode interactif (CLI : demande de confirmation)
-    apply_changes: Optional[bool] = False
+    #   - True  => apply changes to Spotify
+    #   - False => PREVIEW only (no write)
+    apply_changes: bool = False
 
 
 def _load_tracks_for_pipeline(
@@ -67,6 +67,15 @@ def run_pipeline(opts: PipelineOptions) -> Dict[str, Any]:
         tracks,
         force_refresh=opts.force_external_refresh,
     )
+    if unmatched_tracks:
+        report_path = write_unmatched_report(
+            unmatched_tracks,
+            filename="unmatched_external_features.md",
+        )
+        print_info(
+            f"External features missing for {len(unmatched_tracks)} tracks. "
+            f"Report: {report_path}"
+        )
 
     classifications = classify_tracks_rule_based(
         tracks=tracks,
@@ -118,14 +127,14 @@ def run_pipeline(opts: PipelineOptions) -> Dict[str, Any]:
 
 def run_cli_pipeline() -> None:
     """
-    Version CLI : feu complet avec interaction (confirmations, etc.).
-    Utilise PipelineOptions mais laisse sync_playlists poser la question si besoin.
+    Simple CLI runner around the pipeline.
+    No interactive prompts: behaviour is fully controlled by PipelineOptions.
     """
     opts = PipelineOptions(
         refresh_tracks=False,
         force_external_refresh=False,
         refresh_classification=False,
-        apply_changes=None,  # None => sync_playlists demandera la confirmation
+        apply_changes=False,  # safe-by-default: preview only
     )
     run_pipeline(opts)
-    print_success("Synchronization complete (CLI).")
+    print_success("Pipeline run finished (CLI helper).")
