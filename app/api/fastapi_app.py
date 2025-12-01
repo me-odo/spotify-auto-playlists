@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.auth.routes import router as auth_router
+from app.api.data.routes import router as data_router
 from app.api.pipeline.classify import router as pipeline_classify_router
 from app.api.pipeline.diff import router as pipeline_diff_router
 from app.api.pipeline.external import router as pipeline_external_router
@@ -24,6 +25,9 @@ app.include_router(pipeline_external_router, prefix="/pipeline", tags=["pipeline
 app.include_router(pipeline_classify_router, prefix="/pipeline", tags=["pipeline"])
 app.include_router(pipeline_playlists_router, prefix="/pipeline", tags=["pipeline"])
 app.include_router(pipeline_diff_router, prefix="/pipeline", tags=["pipeline"])
+
+# Data routes
+app.include_router(data_router, prefix="/data", tags=["data"])
 
 # Auth routes
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
