@@ -1,24 +1,14 @@
 from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from app.core.logging_utils import log_info
 from app.pipeline.cache_manager import load_classification_cache, load_tracks_cache
 from app.pipeline.playlist_manager import build_target_playlists
 
+from .schemas import BuildResponse, PlaylistPreview
+
 router = APIRouter()
-
-
-class PlaylistPreview(BaseModel):
-    name: str
-    tracks_count: int
-
-
-class BuildResponse(BaseModel):
-    step: str = "build"
-    status: str
-    playlists: List[PlaylistPreview]
 
 
 @router.get("/build", response_model=BuildResponse)

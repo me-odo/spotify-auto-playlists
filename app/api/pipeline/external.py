@@ -1,19 +1,12 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from app.core.logging_utils import log_info, log_step
 from app.pipeline.cache_manager import load_tracks_cache
 from app.pipeline.external_features import enrich_tracks_with_external_features
 
+from .schemas import ExternalResponse
+
 router = APIRouter()
-
-
-class ExternalResponse(BaseModel):
-    step: str = "external"
-    status: str
-    total_tracks: int
-    enriched: int
-    unmatched: int
 
 
 @router.get("/external", response_model=ExternalResponse)

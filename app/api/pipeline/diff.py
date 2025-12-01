@@ -1,7 +1,6 @@
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from app.core.logging_utils import log_info, log_step
 from app.core.models import Track
@@ -19,59 +18,17 @@ from app.spotify import (
     load_spotify_token,
 )
 
+from .schemas import (
+    ApplyRequest,
+    ApplyResponse,
+    ApplyResult,
+    DiffResponse,
+    PlaylistApplyPayload,
+    PlaylistDiff,
+    TrackInfo,
+)
+
 router = APIRouter()
-
-
-# --- Pydantic models pour la réponse diff / apply --------------------------
-
-
-class TrackInfo(BaseModel):
-    id: str
-    name: str
-    artist: str
-    album: Optional[str] = None
-
-
-class PlaylistDiff(BaseModel):
-    name: str
-    playlist_id: Optional[str] = None
-    existing_ids: List[str]
-    target_ids: List[str]
-    duplicates: List[str]
-    new_to_add: List[str]
-
-    existing_tracks: List[TrackInfo]
-    target_tracks: List[TrackInfo]
-    duplicates_tracks: List[TrackInfo]
-    new_to_add_tracks: List[TrackInfo]
-
-
-class DiffResponse(BaseModel):
-    step: str = "diff"
-    status: str
-    playlists: List[PlaylistDiff]
-
-
-class PlaylistApplyPayload(BaseModel):
-    name: str
-    playlist_id: Optional[str] = None
-    target_ids: List[str]
-
-
-class ApplyRequest(BaseModel):
-    playlists: List[PlaylistApplyPayload]
-
-
-class ApplyResult(BaseModel):
-    name: str
-    playlist_id: str
-    target_count: int
-
-
-class ApplyResponse(BaseModel):
-    step: str = "apply"
-    status: str
-    results: List[ApplyResult]
 
 
 # --- Helpers ---------------------------------------------------------------

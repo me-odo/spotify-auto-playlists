@@ -1,25 +1,15 @@
 from typing import Dict
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from app.core.logging_utils import log_info, log_step
 from app.core.models import Classification
 from app.pipeline.cache_manager import load_external_features_cache, load_tracks_cache
 from app.pipeline.classifier import classify_tracks_rule_based
 
+from .schemas import ClassifyResponse, ClassifyStats
+
 router = APIRouter()
-
-
-class ClassifyStats(BaseModel):
-    tracks_processed: int
-    moods: Dict[str, int]
-
-
-class ClassifyResponse(BaseModel):
-    step: str = "classify"
-    status: str
-    stats: ClassifyStats
 
 
 @router.get("/classify", response_model=ClassifyResponse)

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from app.core.logging_utils import log_info, log_step
 from app.pipeline.cache_manager import load_tracks_cache, save_tracks_cache
@@ -10,15 +9,9 @@ from app.spotify.auth import (
 )
 from app.spotify.tracks import get_all_liked_tracks
 
+from .schemas import TracksResponse
+
 router = APIRouter()
-
-
-class TracksResponse(BaseModel):
-    step: str = "tracks"
-    status: str
-    tracks_count: int
-    from_cache: bool
-    fetched_from_spotify: int
 
 
 def _raise_unauth(e: SpotifyTokenMissing) -> None:
