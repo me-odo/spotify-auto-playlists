@@ -15,8 +15,8 @@ Spotify operations they trigger (no filesystem writes, no hidden mutations),
 so that they can be safely used in request/response workflows.
 """
 
-import os
 from collections import Counter
+import os
 from typing import Any, Dict, List, Tuple
 
 from app.config import DIFF_DIR, PLAYLIST_PREFIX_MOOD
