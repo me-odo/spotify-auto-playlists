@@ -275,4 +275,3 @@ def incremental_update_playlist(
     _add_tracks_by_ids(token_info, playlist_id, to_add)
 
     log_info(f"Added {len(to_add)} new tracks to playlist.")
-    log_info(f"Added {len(to_add)} new tracks to playlist.")

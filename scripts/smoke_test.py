@@ -35,7 +35,7 @@ def call(method: str, path: str, **kwargs) -> Dict[str, Any]:
     print(f"\n=== {method.upper()} {path} ===")
     try:
         resp = requests.request(method, url, timeout=30, **kwargs)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Request failed: {e}")
         sys.exit(1)
 
@@ -48,7 +48,7 @@ def call(method: str, path: str, **kwargs) -> Dict[str, Any]:
 
     try:
         data = resp.json()
-    except Exception:
+    except Exception:  # noqa: BLE001
         print("❌ Non-JSON response:")
         print(resp.text)
         sys.exit(1)
@@ -65,48 +65,12 @@ def call(method: str, path: str, **kwargs) -> Dict[str, Any]:
 def poll_job(
     job_id: str, timeout_seconds: int = JOB_POLL_TIMEOUT_SECONDS
 ) -> Dict[str, Any]:
-    """Poll a job until it reaches a terminal state or timeout.
-
-    This function is tolerant to a brief delay between /run-async returning
-    and the job becoming visible in /pipeline/jobs/{job_id}.
-    """
+    """Poll a job until it reaches a terminal state or timeout."""
     deadline = time.time() + timeout_seconds
     last_status: Optional[str] = None
 
     while time.time() < deadline:
-        url = f"{BASE_URL}/pipeline/jobs/{job_id}"
-        print(f"\n=== GET /pipeline/jobs/{job_id} (poll) ===")
-        try:
-            resp = requests.get(url, timeout=30)
-        except Exception as e:
-            print(f"❌ Request failed while polling job: {e}")
-            sys.exit(1)
-
-        print(f"Status: {resp.status_code}")
-
-        if resp.status_code == 404:
-            # Job not visible yet: wait and retry
-            print("ℹ️ Job not found yet, retrying…")
-            time.sleep(JOB_POLL_INTERVAL_SECONDS)
-            continue
-
-        if resp.status_code >= 400:
-            print("❌ Error response while polling job:")
-            print(resp.text)
-            sys.exit(1)
-
-        try:
-            job = resp.json()
-        except Exception:
-            print("❌ Non-JSON response while polling job:")
-            print(resp.text)
-            sys.exit(1)
-
-        snippet = json.dumps(job, indent=2)[:500]
-        print(snippet)
-        if len(snippet) == 500:
-            print("…(truncated)…")
-
+        job = call("get", f"/pipeline/jobs/{job_id}")
         status = job.get("status")
         last_status = status
         print(f"Job {job_id} status: {status}")
@@ -117,7 +81,8 @@ def poll_job(
         time.sleep(JOB_POLL_INTERVAL_SECONDS)
 
     print(
-        f"❌ Job {job_id} did not reach a terminal state in time (last status={last_status})."
+        f"❌ Job {job_id} did not reach a terminal state in time "
+        f"(last status={last_status})."
     )
     sys.exit(1)
 
@@ -130,11 +95,11 @@ def main() -> None:
 
     # --- PIPELINE STEPS (synchronous) ---
     call("get", "/pipeline/health")
-    # call("get", "/pipeline/tracks")
-    # call("get", "/pipeline/external")
-    # call("get", "/pipeline/classify")
-    # call("get", "/pipeline/build")
-    # call("get", "/pipeline/diff")
+    call("get", "/pipeline/tracks")
+    call("get", "/pipeline/external")
+    call("get", "/pipeline/classify")
+    call("get", "/pipeline/build")
+    call("get", "/pipeline/diff")
 
     print("\nSkipping /pipeline/apply (destructive) unless explicitly enabled.")
     # Example if you ever want to test apply in a controlled environment:
@@ -153,7 +118,8 @@ def main() -> None:
         print(f"Using track id for classification patch: {track_id_for_patch}")
     else:
         print(
-            "No tracks available from /data/tracks; PATCH classification test will be skipped."
+            "No tracks available from /data/tracks; PATCH classification test "
+            "will be skipped."
         )
 
     # --- DATA API: FEATURES ---
@@ -189,6 +155,25 @@ def main() -> None:
         patched = call("patch", patch_path, json=patch_body)
         print("\nℹ️  PATCH result:")
         print(json.dumps(patched, indent=2)[:500])
+
+        # Behavioural assertions for TDD-style safety
+        required_keys = {"classifier_id", "track_id", "labels"}
+        missing_keys = [key for key in required_keys if key not in patched]
+        if missing_keys:
+            print(
+                "❌ PATCH classification response is missing required keys: "
+                f"{', '.join(sorted(missing_keys))}."
+            )
+            sys.exit(1)
+
+        labels = patched.get("labels") or {}
+        mood = labels.get("mood")
+        if mood != "smoke_test":
+            print(
+                "❌ PATCH classification did not persist the expected mood "
+                f"(got={mood!r})."
+            )
+            sys.exit(1)
     else:
         print("\n⏭  Skipping PATCH classification test (no track id available).")
 

@@ -58,6 +58,3 @@ def build_playlists() -> BuildResponse:
     log_info(f"Built {len(previews)} target playlists.")
 
     return BuildResponse(status="done", playlists=previews)
-    log_info(f"Built {len(previews)} target playlists.")
-
-    return BuildResponse(status="done", playlists=previews)
