@@ -1,3 +1,10 @@
+"""Public façade for the app.core package.
+
+This module exposes logging helpers, filesystem utilities, and base models
+that are safe to import from other packages. Callers should import these
+cross-cutting concerns from this façade instead of the internal submodules.
+"""
+
 from .fs_utils import ensure_dir, ensure_parent_dir, read_json, write_json
 from .logging_config import configure_logging
 from .logging_utils import (

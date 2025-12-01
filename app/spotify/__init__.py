@@ -1,4 +1,10 @@
-# app/spotify/__init__.py
+"""Public façade for the app.spotify package.
+
+This module exposes the high-level Spotify Web API integration: authentication,
+track retrieval, and playlist management helpers that are safe to import from
+other packages. Callers should import these symbols from this façade instead
+of the internal auth, tracks, or playlists modules.
+"""
 
 from .auth import (
     SpotifyAuthError,
