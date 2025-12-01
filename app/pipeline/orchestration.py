@@ -129,8 +129,8 @@ def run_pipeline_entrypoint() -> None:
     """
     CLI-friendly entrypoint that runs the full pipeline once with safe defaults.
 
-    This helper is intended for manual runs and local testing from the command
-    line, without going through the HTTP API. Behaviour is fully controlled by
+    It is intended for manual runs and local testing from the command line,
+    without going through the HTTP API. Behaviour is controlled by
     PipelineOptions and uses preview-only settings (no writes to Spotify).
     """
     opts = PipelineOptions(
