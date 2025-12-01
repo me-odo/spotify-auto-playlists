@@ -25,10 +25,8 @@ import requests
 
 from app.config import MUSICBRAINZ_USER_AGENT
 from app.core import Track, log_info, log_progress, log_step
-from app.pipeline.cache_manager import (
-    load_external_features_cache,
-    save_external_features_cache,
-)
+
+from .cache_manager import load_external_features_cache, save_external_features_cache
 
 MUSICBRAINZ_API_BASE = "https://musicbrainz.org/ws/2"
 ACOUSTICBRAINZ_API_BASE = "https://acousticbrainz.org/api/v1"

@@ -1,7 +1,8 @@
 from typing import Dict, List
 
-from app.core.models import Track
-from app.pipeline.external_features import enrich_tracks_with_external_features
+from app.core import Track
+
+from .external_features import enrich_tracks_with_external_features
 
 
 class FeatureProvider:

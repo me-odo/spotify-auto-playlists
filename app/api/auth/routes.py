@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
-from app.spotify.auth import (
+from app.spotify import (
     SpotifyTokenMissing,
     build_spotify_auth_url,
     exchange_code_for_token,

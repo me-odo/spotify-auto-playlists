@@ -2,12 +2,12 @@ from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.logging_utils import log_info, log_step
-from app.core.models import Track
-from app.pipeline.cache_manager import load_classification_cache, load_tracks_cache
-from app.pipeline.playlist_manager import (
+from app.core import Track, log_info, log_step
+from app.pipeline import (
     apply_target_playlists,
     build_target_playlists,
+    load_classification_cache,
+    load_tracks_cache,
     preview_playlist_diffs,
 )
 from app.spotify import (

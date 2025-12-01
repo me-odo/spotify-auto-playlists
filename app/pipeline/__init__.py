@@ -1,9 +1,14 @@
-from .cache_manager import load_tracks_cache, save_tracks_cache
+from .cache_manager import (
+    load_tracks_cache,
+    save_classification_cache,
+    save_tracks_cache,
+)
 from .classifier import classify_tracks_rule_based, load_classification_cache
 from .external_features import (
     enrich_tracks_with_external_features,
     load_external_features_cache,
 )
+from .jobs_runner import run_step_for_job
 from .orchestration import PipelineOptions, run_pipeline, run_pipeline_entrypoint
 from .playlist_manager import (
     apply_target_playlists,
@@ -26,6 +31,8 @@ __all__ = [
     "load_classification_cache",
     "load_external_features_cache",
     "load_tracks_cache",
+    "save_classification_cache",
     "save_tracks_cache",
     "write_unmatched_report",
+    "run_step_for_job",
 ]

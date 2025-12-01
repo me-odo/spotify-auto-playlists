@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.core import Classification, Track
-from app.pipeline.cache_manager import (
+from app.pipeline import (
     load_classification_cache,
     load_external_features_cache,
     load_tracks_cache,

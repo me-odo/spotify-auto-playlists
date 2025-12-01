@@ -1,8 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.core.logging_utils import log_info, log_step
-from app.pipeline.cache_manager import load_tracks_cache
-from app.pipeline.external_features import enrich_tracks_with_external_features
+from app.pipeline import enrich_tracks_with_external_features, load_tracks_cache
 
 from .schemas import ExternalResponse
 

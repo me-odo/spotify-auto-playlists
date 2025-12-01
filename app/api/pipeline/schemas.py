@@ -1,3 +1,5 @@
+from datetime import datetime
+from enum import Enum
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
@@ -88,3 +90,26 @@ class ApplyResponse(BaseModel):
     step: str = "apply"
     status: str
     results: List[ApplyResult]
+
+
+class PipelineJobStatus(str, Enum):
+    pending = "pending"
+    running = "running"
+    done = "done"
+    error = "error"
+
+
+class PipelineJobResponse(BaseModel):
+    id: str
+    step: str
+    status: PipelineJobStatus
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    progress: Optional[float] = None
+    message: Optional[str] = None
+    payload: Optional[dict] = None
+
+
+class PipelineJobListResponse(BaseModel):
+    jobs: List[PipelineJobResponse]

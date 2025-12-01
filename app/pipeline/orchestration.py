@@ -14,8 +14,7 @@ where executing the whole pipeline in a single call is desirable.
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from app.core import log_info, log_section, log_step, log_success
-from app.core.models import Track
+from app.core import Track, log_info, log_section, log_step, log_success
 from app.spotify import (
     get_all_liked_tracks,
     get_current_user_id,
