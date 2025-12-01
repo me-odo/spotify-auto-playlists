@@ -22,6 +22,7 @@ from .jobs import (
     save_jobs,
     update_job,
 )
+from .repositories import ClassificationRepository, TracksRepository
 
 __all__ = [
     "load_tracks_cache",
@@ -37,4 +38,6 @@ __all__ = [
     "load_jobs",
     "save_jobs",
     "update_job",
+    "TracksRepository",
+    "ClassificationRepository",
 ]

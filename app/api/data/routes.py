@@ -4,14 +4,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.core import Classification, Track
-from app.pipeline import (
-    load_classification_cache,
-    load_external_features_cache,
-    load_tracks_cache,
-    save_classification_cache,
-)
+from app.data import ClassificationRepository, TracksRepository
+from app.pipeline import load_external_features_cache
 
 router = APIRouter()
+
+tracks_repository = TracksRepository()
+classification_repository = ClassificationRepository()
 
 
 class TrackInfo(BaseModel):
@@ -46,7 +45,7 @@ def get_tracks(
     The `include_features` flag is accepted for forward-compatibility but is
     currently not used to alter the response payload.
     """
-    tracks: List[Track] = load_tracks_cache() or []
+    tracks: List[Track] = tracks_repository.load_tracks() or []
     total = len(tracks)
 
     if limit < 0 or offset < 0:
@@ -109,7 +108,7 @@ def get_classifications(classifier_id: str) -> Dict[str, Dict]:
     if classifier_id != DEFAULT_CLASSIFIER_ID:
         return {}
 
-    cache = load_classification_cache() or {}
+    cache = classification_repository.load_classifications(classifier_id) or {}
     # Expose a simple mapping track_id -> labels dict for the API.
 
     return {
@@ -135,7 +134,7 @@ def patch_classification(
     if classifier_id != DEFAULT_CLASSIFIER_ID:
         raise HTTPException(status_code=404, detail="Unknown classifier id.")
 
-    cache = load_classification_cache() or {}
+    cache = classification_repository.load_classifications(classifier_id) or {}
     labels = body.labels or {}
 
     existing = cache.get(track_id)
@@ -153,7 +152,7 @@ def patch_classification(
                 setattr(classification, key, value)
 
     cache[track_id] = classification
-    save_classification_cache(cache)
+    classification_repository.save_classifications(classifier_id, cache)
 
     return {
         "classifier_id": classifier_id,
