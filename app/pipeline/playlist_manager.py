@@ -1,3 +1,20 @@
+"""Playlist target construction and synchronization helpers.
+
+This module is responsible for building target playlists from tracks and their
+classifications (mood/genre/year) and then synchronizing those targets with
+Spotify.
+
+It exposes:
+  - CLI-style helpers such as sync_playlists(), which generate .diff files
+    on disk and optionally apply incremental changes.
+  - API-oriented helpers preview_playlist_diffs() and apply_target_playlists(),
+    which are designed to be called from the HTTP layer.
+
+The API-oriented functions must remain side-effect free except for the actual
+Spotify operations they trigger (no filesystem writes, no hidden mutations),
+so that they can be safely used in request/response workflows.
+"""
+
 import os
 from collections import Counter
 from typing import Any, Dict, List, Tuple

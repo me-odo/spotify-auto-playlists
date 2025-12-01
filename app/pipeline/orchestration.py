@@ -1,3 +1,16 @@
+"""Orchestration helpers for the CLI pipeline entrypoint.
+
+This module wires together all pipeline stages into the high-level
+run_pipeline() function that is primarily used for command-line execution.
+
+The HTTP API layer does not call run_pipeline() directly; instead it exposes
+step-by-step endpoints (tracks, external features, classifications, playlists)
+so the frontend can run and inspect each stage independently.
+
+run_pipeline() remains useful for local CLI runs and integration-style tests,
+where executing the whole pipeline in a single call is desirable.
+"""
+
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -114,10 +127,11 @@ def run_pipeline(opts: PipelineOptions) -> Dict[str, Any]:
 
 def run_pipeline_entrypoint() -> None:
     """
-    Simple Python entrypoint around the pipeline.
+    CLI-friendly entrypoint that runs the full pipeline once with safe defaults.
 
-    Behaviour is fully controlled by PipelineOptions and uses safe defaults
-    (preview-only, no writes to Spotify).
+    This helper is intended for manual runs and local testing from the command
+    line, without going through the HTTP API. Behaviour is fully controlled by
+    PipelineOptions and uses preview-only settings (no writes to Spotify).
     """
     opts = PipelineOptions(
         refresh_tracks=False,
@@ -126,7 +140,4 @@ def run_pipeline_entrypoint() -> None:
         apply_changes=False,  # safe-by-default: preview only
     )
     run_pipeline(opts)
-    log_success("Pipeline run finished (entrypoint).")
-    run_pipeline(opts)
-    log_success("Pipeline run finished (entrypoint).")
     log_success("Pipeline run finished (entrypoint).")

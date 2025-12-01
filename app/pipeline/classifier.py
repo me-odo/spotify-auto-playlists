@@ -1,3 +1,19 @@
+"""Rule-based track classification using external features.
+
+This module assigns a coarse-grained classification (mood/genre/year) to each
+Spotify track based on external_features produced by
+app.pipeline.external_features.enrich_tracks_with_external_features.
+
+The core function, classify_tracks_rule_based(), is intentionally simple and
+deterministic so that it can be called both from the CLI pipeline and from
+API-driven workflows.
+
+Important constraint:
+  - This module must remain side-effect free except for updating and persisting
+    the classification cache on disk. It must not perform any Spotify I/O or
+    other external side effects.
+"""
+
 from typing import Dict, List
 
 from app.core.logging_utils import log_info
