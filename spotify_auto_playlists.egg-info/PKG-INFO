@@ -1,0 +1,164 @@
+Metadata-Version: 2.4
+Name: spotify-auto-playlists
+Version: 0.1.0
+Summary: Backend API for mood-based Spotify auto playlists.
+Author: me-odo
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi
+Requires-Dist: uvicorn[standard]
+Requires-Dist: python-dotenv
+Requires-Dist: requests
+Provides-Extra: dev
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+
+# Spotify Auto-Playlists — Modern Pipeline Architecture
+
+A modular, data-driven engine that builds playlists automatically for a Spotify user,
+based on classification pipelines, configurable typologies, and multiple enrichment
+sources.
+
+This project is designed to be:
+- **extensible** (feature providers, classifiers, playlist rules)
+- **observable** (API exposing full data)
+- **async-friendly** (long-running pipeline steps run in background jobs)
+- **front-driven** (the front can inspect & edit all data)
+- **pipeline-agnostic** (steps may run independently or in parallel)
+
+## 🚀 High-Level Architecture
+
+```
+Spotify API
+     |
+     v
+ Tracks Loader (sources)
+     |
+     v
+ Feature Providers (AcousticBrainz, MB, LLM, …)
+     |
+     v
+ Classifiers (mood, genre, energy…)
+     |
+     v
+ Playlist Builder (rules / typologies)
+     |
+     v
+ Spotify Playlist Sync
+```
+
+## Layers
+
+### API Layer
+- Thin FastAPI routes
+- Response models only
+- Endpoints:
+  - /pipeline/*
+  - /data/*
+  - /config/*
+  - /pipeline/jobs/*
+
+### Pipeline Layer
+Pure business logic. Context‑agnostic.
+
+### Data Layer
+JSON-backed storage: tracks, features, classifications, configs, jobs.
+
+### Spotify Integration
+OAuth, playlist sync helpers, incremental updates.
+
+## Feature Providers
+
+```
+class FeatureProvider:
+    id: str
+    def run(self, tracks) -> Dict[track_id, Any]: ...
+```
+
+Examples:
+- acousticbrainz
+- musicbrainz
+- local_llm_tagger
+
+Stored under:
+```
+features/<provider_id>.json
+```
+
+## Classifiers
+
+```
+class Classifier:
+    id: str
+    def run(self, tracks, features) -> Dict[track_id, labels]: ...
+```
+
+Stored under:
+```
+classification/<classifier_id>.json
+```
+
+## Configurations
+
+### Track sources
+[{ "type": "liked_tracks" }, { "type": "playlist", "playlist_id": "…" }]
+
+### Enabled providers
+["acousticbrainz", "local_agent_v1"]
+
+### Enabled classifiers
+["mood_v1"]
+
+### Playlist typologies
+
+```
+{
+  "id": "mood_chill",
+  "name_template": "Auto — Mood — {mood}",
+  "rules": { "mood": "chill" }
+}
+```
+
+## Pipeline (sync)
+
+- /pipeline/tracks
+- /pipeline/features
+- /pipeline/classify
+- /pipeline/build
+- /pipeline/diff
+- /pipeline/apply
+
+## Pipeline (async)
+
+- POST /pipeline/{step}/run-async → job_id
+- GET  /pipeline/jobs/{id}
+- GET  /pipeline/jobs
+
+## Data API
+
+- GET /data/tracks
+- GET /data/features/{provider}
+- GET /data/classifications/{classifier}
+- PATCH /data/classifications/{classifier}/{track_id}
+
+## Playlist Generation
+
+Depends on:
+- tracks
+- classifiers
+- typologies (rules)
+
+Builds target playlists + diffs with Spotify.
+
+## Roadmap
+
+- Multi‑provider enrichment
+- Classifier ensembles
+- UI rule builder
+- Local LLM feature extraction
+- Recommendation layer
+
+## License
+MIT

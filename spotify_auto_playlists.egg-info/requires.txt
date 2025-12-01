@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+requests
+
+[dev]
+black
+ruff
+mypy
+pytest

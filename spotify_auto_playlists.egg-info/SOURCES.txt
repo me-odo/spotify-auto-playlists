@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+app/__init__.py
+app/config.py
+spotify_auto_playlists.egg-info/PKG-INFO
+spotify_auto_playlists.egg-info/SOURCES.txt
+spotify_auto_playlists.egg-info/dependency_links.txt
+spotify_auto_playlists.egg-info/requires.txt
+spotify_auto_playlists.egg-info/top_level.txt
