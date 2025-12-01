@@ -49,4 +49,3 @@ def get_all_liked_tracks(token_info: Dict) -> List[Track]:
 
     log_info(f"{len(tracks)} liked tracks fetched.")
     return tracks
-    return tracks

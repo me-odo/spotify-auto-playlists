@@ -105,7 +105,6 @@ def load_jobs() -> Dict[str, PipelineJob]:
 
 
 def save_jobs(jobs: Dict[str, PipelineJob]) -> None:
-    os.makedirs(CACHE_DIR, exist_ok=True)
     serialised = {job_id: _serialize_job(job) for job_id, job in jobs.items()}
     write_json(JOBS_FILE, serialised)
 

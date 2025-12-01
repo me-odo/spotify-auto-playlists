@@ -240,6 +240,3 @@ def run_step_for_job(step: str) -> Dict:
 
     # This line should not be reachable due to the SUPPORTED_STEPS guard.
     raise ValueError(f"Unsupported pipeline step: {step!r}")
-
-    # This line should not be reachable due to the SUPPORTED_STEPS guard.
-    raise ValueError(f"Unsupported pipeline step: {step!r}")

@@ -1,10 +1,11 @@
 import json
 import os
+from pathlib import Path
 import tempfile
 from typing import Any, Callable, Optional
 
 
-def ensure_parent_dir(path: str) -> None:
+def ensure_parent_dir(path: Path | str) -> None:
     """
     Ensure the parent directory of a given file path exists.
     Example:
@@ -23,53 +24,45 @@ def ensure_dir(directory: str) -> None:
         os.makedirs(directory, exist_ok=True)
 
 
-def write_json(path: str, data: Any) -> None:
+def write_json(path: str | Path, data: Any) -> None:
     """
-    Write a JSON file in a robust, atomic way.
+    Write JSON data to a file using an atomic replace.
 
-    Steps:
-    1. Ensure the parent directory exists.
-    2. Write the JSON content to a temporary file in the same directory.
-    3. Flush and fsync the file descriptor.
-    4. Atomically replace the target file with the temporary file.
+    The JSON content is first written to a temporary file in the same directory
+    as the target path. The temporary file is flushed and fsynced to ensure
+    the data is safely persisted on disk, then atomically moved over the
+    target path using os.replace.
 
-    This guarantees that:
-    - there is never a partially written file at `path`,
-    - the function only returns once the data has been durably written.
+    This makes the operation robust against partial writes or process crashes:
+    callers will either see the previous valid file contents or the new full
+    JSON document, but never a truncated or corrupted file.
     """
-    ensure_parent_dir(path)
+    target_path = Path(path)
+    ensure_parent_dir(target_path)
 
-    directory = os.path.dirname(path) or "."
-    tmp_file = None
+    # Create a temporary file in the same directory as the target file.
+    fd, tmp_path_str = tempfile.mkstemp(
+        dir=str(target_path.parent),
+        prefix=target_path.name,
+        suffix=".tmp",
+    )
+    tmp_path = Path(tmp_path_str)
 
     try:
-        # Create a temporary file in the same directory as the target.
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=directory,
-            delete=False,
-        ) as tmp:
-            tmp_file = tmp.name
-            json.dump(data, tmp, ensure_ascii=False, indent=2)
-            tmp.flush()
-            os.fsync(tmp.fileno())
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
 
-        # Atomic rename: on POSIX systems, this is guaranteed to be atomic.
-        os.replace(tmp_file, path)
-
-    finally:
-        # In case of an exception before os.replace, try to clean up.
-        if (
-            tmp_file is not None
-            and os.path.exists(tmp_file)
-            and os.path.basename(tmp_file) != os.path.basename(path)
-        ):
-            try:
-                os.remove(tmp_file)
-            except OSError:
-                # Best-effort cleanup, ignore failures.
-                pass
+        # Atomically replace the target file with the temporary file.
+        os.replace(tmp_path, target_path)
+    except Exception:
+        # Best-effort cleanup of the temporary file if something goes wrong.
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def read_json(
@@ -79,9 +72,14 @@ def read_json(
     on_error: Optional[Callable[[Exception], None]] = None,
 ) -> Any:
     """
-    Read a JSON file.
+    Read a JSON file safely.
+
     - returns `default` if the file does not exist
-    - returns `default` if JSON is invalid (optionally calling on_error)
+    - returns `default` if JSON is invalid or corrupted (optionally calling on_error)
+
+    This makes it safe to call against cache/job files that may be partially
+    written or corrupted on disk; callers can rely on either a fully parsed
+    object or the provided `default` value.
     """
     try:
         with open(path, "r", encoding="utf-8") as f:

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from app.core.logging_utils import log_info, log_step
+from app.core import log_info, log_step
 from app.pipeline import enrich_tracks_with_external_features, load_tracks_cache
 
 from .schemas import ExternalResponse
