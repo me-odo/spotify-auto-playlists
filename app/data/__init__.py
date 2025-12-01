@@ -1,3 +1,10 @@
+"""Public façade for the app.data package.
+
+This module exposes cache loaders/savers and pipeline job persistence helpers
+that are safe to import from other packages. Callers should use this façade
+instead of importing from the internal cache or jobs modules directly.
+"""
+
 from .cache import (
     load_classification_cache,
     load_external_features_cache,
@@ -12,6 +19,7 @@ from .jobs import (
     create_job,
     get_job,
     load_jobs,
+    save_jobs,
     update_job,
 )
 
@@ -27,5 +35,6 @@ __all__ = [
     "create_job",
     "get_job",
     "load_jobs",
+    "save_jobs",
     "update_job",
 ]

@@ -1,3 +1,11 @@
+"""Public façade for the app.pipeline package.
+
+This module exposes the high-level pipeline orchestration API, including cache
+helpers, enrichment, classification, playlist building, diffing, application,
+and job runner entrypoints. Other packages should import pipeline behaviour
+from this façade instead of the internal pipeline submodules.
+"""
+
 from .cache_manager import (
     load_tracks_cache,
     save_classification_cache,

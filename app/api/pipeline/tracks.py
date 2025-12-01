@@ -2,8 +2,12 @@ from fastapi import APIRouter, HTTPException
 
 from app.core import log_info, log_step
 from app.pipeline import load_tracks_cache, save_tracks_cache
-from app.spotify import SpotifyTokenMissing, build_spotify_auth_url, load_spotify_token
-from app.spotify.tracks import get_all_liked_tracks
+from app.spotify import (
+    SpotifyTokenMissing,
+    build_spotify_auth_url,
+    get_all_liked_tracks,
+    load_spotify_token,
+)
 
 from .schemas import TracksResponse
 
