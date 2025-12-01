@@ -9,7 +9,7 @@ from app.api.pipeline.health import router as pipeline_health_router
 from app.api.pipeline.jobs import router as jobs_router
 from app.api.pipeline.playlists import router as pipeline_playlists_router
 from app.api.pipeline.tracks import router as pipeline_tracks_router
-from app.core.logging_config import configure_logging
+from app.core import configure_logging
 
 configure_logging()
 

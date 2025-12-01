@@ -1,25 +1,22 @@
 from typing import Dict, List
 
-from app.core.logging_utils import log_info, log_step
-from app.core.models import Classification
-from app.pipeline.cache_manager import (
+from app.core import Classification, log_info, log_step
+from app.spotify import (
+    SpotifyTokenMissing,
+    get_all_liked_tracks,
+    get_user_playlists,
+    load_spotify_token,
+)
+
+from .cache_manager import (
     load_classification_cache,
     load_external_features_cache,
     load_tracks_cache,
     save_tracks_cache,
 )
-from app.pipeline.classifier import classify_tracks_rule_based
-from app.pipeline.external_features import enrich_tracks_with_external_features
-from app.pipeline.playlist_manager import (
-    build_target_playlists,
-    preview_playlist_diffs,
-)
-from app.spotify import (
-    SpotifyTokenMissing,
-    get_user_playlists,
-    load_spotify_token,
-)
-from app.spotify.tracks import get_all_liked_tracks
+from .classifier import classify_tracks_rule_based
+from .external_features import enrich_tracks_with_external_features
+from .playlist_manager import build_target_playlists, preview_playlist_diffs
 
 SUPPORTED_STEPS = {"tracks", "external", "classify", "build", "diff", "apply"}
 
@@ -240,6 +237,9 @@ def run_step_for_job(step: str) -> Dict:
         return _run_diff_step()
     if step == "apply":
         return _run_apply_step()
+
+    # This line should not be reachable due to the SUPPORTED_STEPS guard.
+    raise ValueError(f"Unsupported pipeline step: {step!r}")
 
     # This line should not be reachable due to the SUPPORTED_STEPS guard.
     raise ValueError(f"Unsupported pipeline step: {step!r}")

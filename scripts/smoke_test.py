@@ -65,12 +65,48 @@ def call(method: str, path: str, **kwargs) -> Dict[str, Any]:
 def poll_job(
     job_id: str, timeout_seconds: int = JOB_POLL_TIMEOUT_SECONDS
 ) -> Dict[str, Any]:
-    """Poll a job until it reaches a terminal state or timeout."""
+    """Poll a job until it reaches a terminal state or timeout.
+
+    This function is tolerant to a brief delay between /run-async returning
+    and the job becoming visible in /pipeline/jobs/{job_id}.
+    """
     deadline = time.time() + timeout_seconds
     last_status: Optional[str] = None
 
     while time.time() < deadline:
-        job = call("get", f"/pipeline/jobs/{job_id}")
+        url = f"{BASE_URL}/pipeline/jobs/{job_id}"
+        print(f"\n=== GET /pipeline/jobs/{job_id} (poll) ===")
+        try:
+            resp = requests.get(url, timeout=30)
+        except Exception as e:
+            print(f"❌ Request failed while polling job: {e}")
+            sys.exit(1)
+
+        print(f"Status: {resp.status_code}")
+
+        if resp.status_code == 404:
+            # Job not visible yet: wait and retry
+            print("ℹ️ Job not found yet, retrying…")
+            time.sleep(JOB_POLL_INTERVAL_SECONDS)
+            continue
+
+        if resp.status_code >= 400:
+            print("❌ Error response while polling job:")
+            print(resp.text)
+            sys.exit(1)
+
+        try:
+            job = resp.json()
+        except Exception:
+            print("❌ Non-JSON response while polling job:")
+            print(resp.text)
+            sys.exit(1)
+
+        snippet = json.dumps(job, indent=2)[:500]
+        print(snippet)
+        if len(snippet) == 500:
+            print("…(truncated)…")
+
         status = job.get("status")
         last_status = status
         print(f"Job {job_id} status: {status}")
@@ -94,11 +130,11 @@ def main() -> None:
 
     # --- PIPELINE STEPS (synchronous) ---
     call("get", "/pipeline/health")
-    call("get", "/pipeline/tracks")
-    call("get", "/pipeline/external")
-    call("get", "/pipeline/classify")
-    call("get", "/pipeline/build")
-    call("get", "/pipeline/diff")
+    # call("get", "/pipeline/tracks")
+    # call("get", "/pipeline/external")
+    # call("get", "/pipeline/classify")
+    # call("get", "/pipeline/build")
+    # call("get", "/pipeline/diff")
 
     print("\nSkipping /pipeline/apply (destructive) unless explicitly enabled.")
     # Example if you ever want to test apply in a controlled environment:

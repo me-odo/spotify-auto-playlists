@@ -1,7 +1,8 @@
 from typing import Dict, List, Mapping
 
-from app.core.models import Classification, Track
-from app.pipeline.classifier import classify_tracks_rule_based
+from app.core import Classification, Track
+
+from .classifier import classify_tracks_rule_based
 
 
 class Classifier:

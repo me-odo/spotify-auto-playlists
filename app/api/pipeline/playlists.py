@@ -2,9 +2,12 @@ from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.logging_utils import log_info
-from app.pipeline.cache_manager import load_classification_cache, load_tracks_cache
-from app.pipeline.playlist_manager import build_target_playlists
+from app.core import log_info
+from app.pipeline import (
+    build_target_playlists,
+    load_classification_cache,
+    load_tracks_cache,
+)
 
 from .schemas import BuildResponse, PlaylistPreview
 
@@ -52,6 +55,9 @@ def build_playlists() -> BuildResponse:
         for name, ids in target_playlists.items()
     ]
 
+    log_info(f"Built {len(previews)} target playlists.")
+
+    return BuildResponse(status="done", playlists=previews)
     log_info(f"Built {len(previews)} target playlists.")
 
     return BuildResponse(status="done", playlists=previews)

@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import os
 from typing import Any, Dict, Optional
 
 from app.config import CACHE_DIR
-from app.core.fs_utils import read_json, write_json
+from app.core import read_json, write_json
 
 JOBS_FILE = os.path.join(CACHE_DIR, "pipeline_jobs.json")
 
@@ -44,13 +44,29 @@ def _serialize_job(job: PipelineJob) -> Dict[str, Any]:
     }
 
 
-def _deserialize_job(data: Dict[str, Any]) -> PipelineJob:
-    created_at = datetime.fromisoformat(data["created_at"])
-    started_raw = data.get("started_at")
-    finished_raw = data.get("finished_at")
+def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO datetime string and normalize it to UTC-aware.
 
-    started_at = datetime.fromisoformat(started_raw) if started_raw else None
-    finished_at = datetime.fromisoformat(finished_raw) if finished_raw else None
+    This prevents mixing naive and aware datetimes when sorting jobs.
+    """
+    if not value:
+        return None
+
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        # Assume previous jobs were stored as UTC without explicit tz info.
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _deserialize_job(data: Dict[str, Any]) -> PipelineJob:
+    created_at = _parse_dt(data["created_at"])
+    started_at = _parse_dt(data.get("started_at"))
+    finished_at = _parse_dt(data.get("finished_at"))
+
+    # Fallback safety: created_at should never be None
+    if created_at is None:
+        created_at = datetime.now(timezone.utc)
 
     status_value = data.get("status", PipelineJobStatus.PENDING.value)
     status = PipelineJobStatus(status_value)
@@ -98,11 +114,10 @@ def create_job(step: str) -> PipelineJob:
     from uuid import uuid4
 
     jobs = load_jobs()
-    job_id = str(uuid4())
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     job = PipelineJob(
-        id=job_id,
+        id=str(uuid4()),
         step=step,
         status=PipelineJobStatus.PENDING,
         created_at=now,
@@ -112,8 +127,11 @@ def create_job(step: str) -> PipelineJob:
         message=None,
         payload=None,
     )
+
+    # Persist the new job
     jobs[job.id] = job
     save_jobs(jobs)
+
     return job
 
 

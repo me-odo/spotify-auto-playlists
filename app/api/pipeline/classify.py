@@ -2,10 +2,12 @@ from typing import Dict
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.logging_utils import log_info, log_step
-from app.core.models import Classification
-from app.pipeline.cache_manager import load_external_features_cache, load_tracks_cache
-from app.pipeline.classifier import classify_tracks_rule_based
+from app.core import Classification, log_info, log_step
+from app.pipeline import (
+    classify_tracks_rule_based,
+    load_external_features_cache,
+    load_tracks_cache,
+)
 
 from .schemas import ClassifyResponse, ClassifyStats
 

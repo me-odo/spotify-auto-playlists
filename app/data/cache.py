@@ -6,9 +6,7 @@ from app.config import (
     EXTERNAL_FEATURES_CACHE_FILE,
     TRACKS_CACHE_FILE,
 )
-from app.core.fs_utils import read_json, write_json
-from app.core.logging_utils import log_warning
-from app.core.models import Classification, Track
+from app.core import Classification, Track, log_warning, read_json, write_json
 
 # ---------- Tracks cache ----------
 

@@ -1,7 +1,7 @@
 from typing import Dict, List
 
-from app.core.models import Classification, Track
-from app.data.cache import (
+from app.core import Classification, Track
+from app.data import (
     load_classification_cache as _load_classification_cache,
     load_external_features_cache as _load_external_features_cache,
     load_tracks_cache as _load_tracks_cache,

@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from app.data.jobs import (
+from app.data import (
     PipelineJob as DataPipelineJob,
     PipelineJobStatus as DataPipelineJobStatus,
     create_job,
@@ -11,7 +11,7 @@ from app.data.jobs import (
     load_jobs,
     update_job,
 )
-from app.pipeline.jobs_runner import run_step_for_job
+from app.pipeline import run_step_for_job
 
 from .schemas import PipelineJobListResponse, PipelineJobResponse, PipelineJobStatus
 
@@ -40,7 +40,7 @@ def _run_job_background(job_id: str) -> None:
         return
 
     job.status = DataPipelineJobStatus.RUNNING
-    job.started_at = datetime.utcnow()
+    job.started_at = datetime.now(timezone.utc)
     job.progress = 0.0
     job.message = None
     update_job(job)
@@ -50,11 +50,11 @@ def _run_job_background(job_id: str) -> None:
         job.payload = payload
         job.progress = 1.0
         job.status = DataPipelineJobStatus.DONE
-        job.finished_at = datetime.utcnow()
+        job.finished_at = datetime.now(timezone.utc)
     except Exception as exc:  # noqa: BLE001
         job.status = DataPipelineJobStatus.ERROR
         job.message = str(exc)
-        job.finished_at = datetime.utcnow()
+        job.finished_at = datetime.now(timezone.utc)
     finally:
         update_job(job)
 
@@ -91,6 +91,7 @@ def get_job_detail(job_id: str) -> PipelineJobResponse:
     """
     Retrieve a single pipeline job by id.
     """
+
     job = get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found.")

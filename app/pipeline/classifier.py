@@ -16,12 +16,9 @@ Important constraint:
 
 from typing import Dict, List
 
-from app.core.logging_utils import log_info
-from app.core.models import Classification, Track
-from app.pipeline.cache_manager import (
-    load_classification_cache,
-    save_classification_cache,
-)
+from app.core import Classification, Track, log_info
+
+from .cache_manager import load_classification_cache, save_classification_cache
 
 
 def classify_tracks_rule_based(
