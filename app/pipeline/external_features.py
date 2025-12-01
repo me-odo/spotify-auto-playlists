@@ -1,3 +1,23 @@
+"""External feature enrichment for Spotify tracks.
+
+This module implements a cache-driven enrichment pipeline that augments Spotify
+tracks with additional metadata fetched from external services:
+
+  - MusicBrainz: used to resolve a recording MBID for a given track
+  - AcousticBrainz: used to retrieve high-level audio features for that MBID
+
+The design is intentionally cache-first:
+  - a local cache, indexed by Spotify track ID, is loaded at the beginning
+  - only tracks missing from the cache (or all tracks when force_refresh=True)
+    are queried against the external APIs
+  - the cache is persisted incrementally as new entries are discovered
+
+The main entrypoint, enrich_tracks_with_external_features(), encapsulates this
+step-by-step logic and returns both the resolved external_features mapping and
+the list of unmatched tracks, so that later pipeline stages can decide how to
+handle tracks without external data.
+"""
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 

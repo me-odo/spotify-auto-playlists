@@ -45,4 +45,3 @@ SCOPES = [
 PLAYLIST_PREFIX_MOOD = "Auto – Mood – "
 PLAYLIST_PREFIX_GENRE = "Auto – Genre – "
 PLAYLIST_PREFIX_YEAR = "Auto – Year – "
-PLAYLIST_PREFIX_YEAR = "Auto – Year – "
