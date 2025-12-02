@@ -1,0 +1,3 @@
+# Architecture Documentation
+
+English content ...
