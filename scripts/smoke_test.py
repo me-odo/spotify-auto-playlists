@@ -189,6 +189,34 @@ def test_enrichments_endpoint() -> None:
     )
 
 
+def test_rules_endpoint() -> None:
+    """Basic non-regression test for playlist rules API."""
+    print("\n=== GET /data/rules ===")
+
+    rules = call("get", "/data/rules")
+
+    # The endpoint must return a JSON array (list of rule definitions).
+    if not isinstance(rules, list):
+        print("❌ /data/rules did not return a JSON list.")
+        sys.exit(1)
+
+    if rules:
+        sample = rules[0]
+        if not isinstance(sample, dict):
+            print("❌ /data/rules first item is not a JSON object (dict).")
+            sys.exit(1)
+
+        missing = [key for key in ("id", "name") if key not in sample]
+        if missing:
+            print(
+                "❌ /data/rules items are missing required keys: "
+                f"{', '.join(sorted(missing))}."
+            )
+            sys.exit(1)
+
+    print(f"ℹ️ /data/rules returned {len(rules)} rule definition(s).")
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
@@ -281,6 +309,9 @@ def main() -> None:
 
     # --- DATA API: ENRICHMENTS ---
     test_enrichments_endpoint()
+
+    # --- DATA API: PLAYLIST RULES ---
+    test_rules_endpoint()
 
     # --- ASYNC PIPELINE JOBS (legacy step=tracks) ---
     print("\n🚀 Testing legacy async job: step=tracks")
