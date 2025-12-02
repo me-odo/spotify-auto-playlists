@@ -21,6 +21,7 @@ from .playlists import (
     get_playlist_tracks,
     get_user_playlists,
     incremental_update_playlist,
+    list_user_playlists,
     set_playlist_tracks,
 )
 from .sources import TrackSource, TrackSourceType
@@ -41,6 +42,7 @@ __all__ = [
     "get_playlist_tracks",
     "set_playlist_tracks",
     "incremental_update_playlist",
+    "list_user_playlists",
     "TrackSource",
     "TrackSourceType",
 ]

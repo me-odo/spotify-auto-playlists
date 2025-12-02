@@ -9,6 +9,7 @@ from app.api.pipeline.health import router as pipeline_health_router
 from app.api.pipeline.jobs import router as jobs_router
 from app.api.pipeline.playlists import router as pipeline_playlists_router
 from app.api.pipeline.tracks import router as pipeline_tracks_router
+from app.api.spotify.playlists import router as spotify_playlists_router
 from app.core import configure_logging
 
 configure_logging()
@@ -33,3 +34,6 @@ app.include_router(data_router, prefix="/data", tags=["data"])
 
 # Auth routes
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+
+# Spotify routes
+app.include_router(spotify_playlists_router, prefix="/spotify", tags=["spotify"])
