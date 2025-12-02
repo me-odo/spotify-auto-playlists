@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.core import Classification, Track
-from app.data import ClassificationRepository, TracksRepository
+from app.data import ClassificationRepository, TracksRepository, load_enrichments_cache
 from app.pipeline import load_external_features_cache
 
 router = APIRouter()
@@ -159,3 +159,37 @@ def patch_classification(
         "track_id": track_id,
         "labels": serialize_classification(classification),
     }
+
+
+@router.get("/enrichments")
+def get_enrichments() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Return unified track enrichments indexed by track id.
+
+    The response is a JSON object:
+      {
+        "track_id": [
+          { "source": "...", "version": "...", "timestamp": "...", "categories": {...} },
+          ...
+        ],
+        ...
+      }
+
+    If no enrichments exist, an empty mapping {} is returned.
+    """
+    cache = load_enrichments_cache() or {}
+
+    result: Dict[str, List[Dict[str, Any]]] = {}
+    for track_id, entries in cache.items():
+        items: List[Dict[str, Any]] = []
+        if isinstance(entries, list):
+            for entry in entries:
+                if hasattr(entry, "dict"):
+                    # TrackEnrichment (or similar Pydantic model)
+                    items.append(entry.dict())
+                elif isinstance(entry, dict):
+                    items.append(dict(entry))
+        if items:
+            result[str(track_id)] = items
+
+    return result

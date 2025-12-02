@@ -19,12 +19,14 @@ handle tracks without external data.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import requests
 
 from app.config import MUSICBRAINZ_USER_AGENT
-from app.core import Track, log_info, log_progress, log_step
+from app.core import Track, TrackEnrichment, log_info, log_progress, log_step
+from app.data import load_enrichments_cache, save_enrichments_cache
 
 from .cache_manager import load_external_features_cache, save_external_features_cache
 
@@ -190,6 +192,31 @@ def _build_unmatched_tracks(
     return [t for t in tracks if t.id not in external_features]
 
 
+def _update_enrichment_cache_from_external(external_features: Dict[str, Dict]) -> None:
+    """
+    Populate the unified enrichment cache from external features.
+
+    This function is additive only and does not alter existing cache entries.
+    """
+    if not external_features:
+        return
+
+    existing = load_enrichments_cache() or {}
+    now = datetime.now(timezone.utc)
+
+    for track_id, features in external_features.items():
+        enrichment = TrackEnrichment(
+            source="external_features",
+            version="v1",
+            timestamp=now,
+            categories=features or {},
+        )
+        bucket = existing.setdefault(str(track_id), [])
+        bucket.append(enrichment)
+
+    save_enrichments_cache(existing)
+
+
 def enrich_tracks_with_external_features(
     tracks: List[Track],
     force_refresh: bool = False,
@@ -224,6 +251,7 @@ def enrich_tracks_with_external_features(
             f"{len(external_features)} tracks already have external data."
         )
         unmatched = _build_unmatched_tracks(tracks, external_features)
+        _update_enrichment_cache_from_external(external_features)
         return external_features, unmatched
 
     total_processed = _process_missing_external_features(
@@ -233,6 +261,7 @@ def enrich_tracks_with_external_features(
     )
 
     unmatched = _build_unmatched_tracks(tracks, external_features)
+    _update_enrichment_cache_from_external(external_features)
 
     log_info(
         f"External features available for {len(external_features)} tracks "

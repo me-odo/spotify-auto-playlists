@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel
 
 
 @dataclass
@@ -26,3 +29,19 @@ class Classification:
     mood: str
     genre: Optional[str] = None
     year: Optional[int] = None
+
+
+class TrackEnrichment(BaseModel):
+    """
+    Unified enrichment entry for a track.
+
+    - source     : logical source of the enrichment (e.g. "external_features")
+    - version    : optional version string for the enrichment pipeline
+    - timestamp  : when the enrichment was computed (UTC naive or tz-aware)
+    - categories : free-form mapping of enrichment keys to values
+    """
+
+    source: str
+    version: Optional[str] = None
+    timestamp: datetime
+    categories: Dict[str, Any]

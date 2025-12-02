@@ -13,6 +13,7 @@ from .cache import (
     save_external_features_cache,
     save_tracks_cache,
 )
+from .enrichments import load_enrichments_cache, save_enrichments_cache
 from .jobs import (
     PipelineJob,
     PipelineJobStatus,
@@ -31,6 +32,8 @@ __all__ = [
     "save_external_features_cache",
     "load_classification_cache",
     "save_classification_cache",
+    "load_enrichments_cache",
+    "save_enrichments_cache",
     "PipelineJob",
     "PipelineJobStatus",
     "create_job",
