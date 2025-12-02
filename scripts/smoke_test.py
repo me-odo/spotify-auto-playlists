@@ -87,6 +87,80 @@ def poll_job(
     sys.exit(1)
 
 
+def test_multi_source_tracks_fetch() -> None:
+    """End-to-end test for multi-source track fetching and aggregation."""
+    print("\n=== POST /pipeline/tracks/fetch-sources (liked source) ===")
+
+    body = {
+        "sources": [
+            {
+                "source_type": "liked",
+                "source_id": None,
+                "label": "Liked tracks (smoke_test)",
+            }
+        ]
+    }
+    response = call("post", "/pipeline/tracks/fetch-sources", json=body)
+
+    jobs = response.get("jobs")
+    if not isinstance(jobs, list) or not jobs:
+        print(
+            "❌ /pipeline/tracks/fetch-sources did not return a non-empty 'jobs' list."
+        )
+        sys.exit(1)
+
+    job = jobs[0]
+    job_id = job.get("id")
+    if not isinstance(job_id, str) or not job_id:
+        print("❌ Job from /pipeline/tracks/fetch-sources is missing a valid 'id'.")
+        sys.exit(1)
+
+    metadata = job.get("metadata") or {}
+    source_type = metadata.get("source_type")
+    if source_type != "liked":
+        print("❌ Expected job metadata.source_type='liked', " f"got {source_type!r}.")
+        sys.exit(1)
+
+    finished = poll_job(job_id)
+    payload = finished.get("payload") or {}
+
+    source = payload.get("source") or {}
+    tracks = payload.get("tracks") or []
+
+    if source.get("source_type") != "liked":
+        print(
+            "❌ Job payload.source.source_type is not 'liked'. "
+            f"(got={source.get('source_type')!r})"
+        )
+        sys.exit(1)
+
+    if not isinstance(tracks, list):
+        print("❌ Job payload.tracks is not a list.")
+        sys.exit(1)
+
+    print("ℹ️ fetch_tracks job returned " f"{len(tracks)} tracks for liked source.")
+
+    print("\n=== GET /pipeline/tracks/aggregate ===")
+    aggregate = call("get", "/pipeline/tracks/aggregate")
+    agg_tracks = aggregate.get("tracks")
+    agg_sources = aggregate.get("sources")
+
+    if not isinstance(agg_tracks, list):
+        print("❌ /pipeline/tracks/aggregate returned a non-list 'tracks' field.")
+        sys.exit(1)
+
+    if not isinstance(agg_sources, list) or not agg_sources:
+        print(
+            "❌ /pipeline/tracks/aggregate returned an invalid or empty 'sources' list."
+        )
+        sys.exit(1)
+
+    print(
+        "ℹ️ aggregate endpoint returned "
+        f"{len(agg_tracks)} tracks and {len(agg_sources)} sources."
+    )
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
@@ -177,10 +251,9 @@ def main() -> None:
     else:
         print("\n⏭  Skipping PATCH classification test (no track id available).")
 
-    # --- ASYNC PIPELINE JOBS ---
-    print("\n🚀 Testing async pipeline jobs API…")
+    # --- ASYNC PIPELINE JOBS (legacy step=tracks) ---
+    print("\n🚀 Testing legacy async job: step=tracks")
 
-    # 1) Start an async job for the 'tracks' step
     step = "tracks"
     job_start_response = call("post", f"/pipeline/{step}/run-async")
     job_id = job_start_response.get("id")
@@ -190,28 +263,104 @@ def main() -> None:
         print("❌ /pipeline/{step}/run-async did not return a job id.")
         sys.exit(1)
 
-    print(f"Started async job: id={job_id}, step={job_step}")
+    print(f"Started legacy async job: id={job_id}, step={job_step}")
 
-    # 2) Poll until the job finishes
     final_job = poll_job(job_id)
     final_status = final_job.get("status")
-    print(f"\nℹ️  Final job status for {job_id}: {final_status}")
+    print(f"\nℹ️  Legacy job final status: {final_status}")
 
     if final_status != "done":
-        print(f"❌ Async job {job_id} ended with non-success status: {final_status}")
+        print(f"❌ Legacy async job {job_id} failed with status={final_status}")
         sys.exit(1)
 
-    # 3) Check that the job appears in the job list
+    # Ensure legacy job appears in job list
     jobs_list = call("get", "/pipeline/jobs")
     jobs = jobs_list.get("jobs", []) or []
     job_ids = {job.get("id") for job in jobs}
-    print(f"\nℹ️  /pipeline/jobs returned {len(jobs)} jobs.")
+    print(f"\nℹ️  /pipeline/jobs returned {len(jobs)} jobs (including legacy).")
 
     if job_id not in job_ids:
-        print(f"❌ Job {job_id} not found in /pipeline/jobs response.")
+        print(f"❌ Legacy job {job_id} not present in /pipeline/jobs.")
         sys.exit(1)
 
-    print("\n✅ Smoke test completed successfully.\n")
+    print("✅ Legacy async job pipeline verified.\n")
+
+    # -------------------------------------------------------------------------
+    # --- MULTI-SOURCE FETCH: async track retrieval + aggregation  ---
+    # -------------------------------------------------------------------------
+
+    print("\n🚀 Testing multi-source async track fetch (new pipeline)…")
+
+    # 1) Define sources (only liked tracks for now)
+    sources_payload = {
+        "sources": [
+            {"source_type": "liked", "source_id": None, "label": "Liked tracks"}
+        ]
+    }
+
+    # 2) Launch fetch jobs
+    fetch_response = call(
+        "post", "/pipeline/tracks/fetch-sources", json=sources_payload
+    )
+    fetch_jobs = fetch_response.get("jobs", [])
+
+    if not fetch_jobs:
+        print("❌ /pipeline/tracks/fetch-sources returned no jobs.")
+        sys.exit(1)
+
+    print(f"Started {len(fetch_jobs)} fetch jobs.")
+
+    # 3) Poll each fetch job
+    completed_jobs = []
+    for job in fetch_jobs:
+        j_id = job.get("id")
+        j_step = job.get("step")
+        j_meta = job.get("metadata", {})
+
+        if not j_id:
+            print("❌ A fetch job is missing its job id.")
+            sys.exit(1)
+
+        print(f"\nPolling fetch job: id={j_id}, step={j_step}, meta={j_meta}")
+
+        final = poll_job(j_id)
+        status = final.get("status")
+        payload = final.get("payload") or {}
+
+        if status != "done":
+            print(f"❌ Fetch job {j_id} failed (status={status}).")
+            sys.exit(1)
+
+        # Validate payload structure
+        if "tracks" not in payload:
+            print(f"❌ Fetch job {j_id} payload missing 'tracks'.")
+            sys.exit(1)
+
+        if "source" not in payload:
+            print(f"❌ Fetch job {j_id} payload missing 'source'.")
+            sys.exit(1)
+
+        completed_jobs.append(final)
+
+    print("\nℹ️ All fetch jobs completed successfully.")
+
+    # 4) Test final aggregation endpoint
+    agg = call("get", "/pipeline/tracks/aggregate")
+
+    if "tracks" not in agg:
+        print("❌ /pipeline/tracks/aggregate response missing 'tracks'.")
+        sys.exit(1)
+
+    if "sources" not in agg:
+        print("❌ /pipeline/tracks/aggregate response missing 'sources'.")
+        sys.exit(1)
+
+    print(
+        f"\nℹ️ Aggregation OK: {len(agg['tracks'])} tracks, {len(agg['sources'])} sources."
+    )
+    print("✅ Multi-source async fetch pipeline verified.\n")
+
+    print("\n🎉 Smoke test completed successfully.\n")
 
 
 if __name__ == "__main__":
