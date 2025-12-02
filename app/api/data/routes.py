@@ -3,12 +3,13 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.core import Classification, Track
+from app.core import Classification, PlaylistRuleSet, Track
 from app.data import (
     ClassificationRepository,
     TracksRepository,
     load_enrichments_cache,
     load_rules,
+    save_rules,
 )
 from app.pipeline import load_external_features_cache
 
@@ -228,3 +229,32 @@ def get_rules() -> List[Dict[str, Any]]:
             continue
 
     return result
+
+
+@router.post("/rules")
+def upsert_rule(rule: PlaylistRuleSet) -> Dict[str, Any]:
+    """
+    Create or update a playlist rule.
+
+    - If a rule with the same id exists, it is replaced (upsert semantics).
+    - Otherwise, the new rule is appended.
+    - The saved rule is returned as a JSON object.
+    """
+    existing_rules = load_rules() or []
+
+    updated_rules: List[PlaylistRuleSet] = []
+    found = False
+    for existing in existing_rules:
+        if existing.id == rule.id:
+            updated_rules.append(rule)
+            found = True
+        else:
+            updated_rules.append(existing)
+
+    if not found:
+        updated_rules.append(rule)
+
+    save_rules(updated_rules)
+
+    # Return the rule as a plain dict; this includes at least "id" and "name".
+    return rule.dict()
