@@ -28,6 +28,7 @@ class PipelineJob:
     progress: Optional[float] = None
     message: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 def _serialize_job(job: PipelineJob) -> Dict[str, Any]:
@@ -41,6 +42,7 @@ def _serialize_job(job: PipelineJob) -> Dict[str, Any]:
         "progress": job.progress,
         "message": job.message,
         "payload": job.payload,
+        "metadata": job.metadata or {},
     }
 
 
@@ -70,6 +72,7 @@ def _deserialize_job(data: Dict[str, Any]) -> PipelineJob:
 
     status_value = data.get("status", PipelineJobStatus.PENDING.value)
     status = PipelineJobStatus(status_value)
+    metadata = data.get("metadata") or {}
 
     return PipelineJob(
         id=data["id"],
@@ -81,6 +84,7 @@ def _deserialize_job(data: Dict[str, Any]) -> PipelineJob:
         progress=data.get("progress"),
         message=data.get("message"),
         payload=data.get("payload"),
+        metadata=metadata,
     )
 
 
@@ -109,7 +113,7 @@ def save_jobs(jobs: Dict[str, PipelineJob]) -> None:
     write_json(JOBS_FILE, serialised)
 
 
-def create_job(step: str) -> PipelineJob:
+def create_job(step: str, metadata: Optional[Dict[str, Any]] = None) -> PipelineJob:
     from uuid import uuid4
 
     jobs = load_jobs()
@@ -125,6 +129,7 @@ def create_job(step: str) -> PipelineJob:
         progress=None,
         message=None,
         payload=None,
+        metadata=metadata or {},
     )
 
     # Persist the new job
