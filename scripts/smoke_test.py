@@ -278,6 +278,51 @@ def test_rules_write_and_read() -> None:
     print(f"ℹ️ /data/rules contains {len(matching)} rule(s) with id={rule_id!r}.")
 
 
+def test_rules_evaluation_endpoint() -> None:
+    """Functional test for the rule evaluation API."""
+    print("\n=== POST /data/rules/evaluate ===")
+
+    body = {
+        "rules": {
+            "operator": "and",
+            "conditions": [
+                {
+                    "field": "mood",
+                    "operator": "eq",
+                    "value": "smoke_test_mood",
+                }
+            ],
+        },
+        "enrichment": {
+            "mood": "smoke_test_mood",
+        },
+    }
+
+    result = call("post", "/data/rules/evaluate", json=body)
+
+    if not isinstance(result, dict):
+        print("❌ POST /data/rules/evaluate did not return a JSON object.")
+        sys.exit(1)
+
+    if "matches" not in result:
+        print("❌ /data/rules/evaluate response is missing 'matches' key.")
+        sys.exit(1)
+
+    matches = result["matches"]
+    if not isinstance(matches, bool):
+        print("❌ /data/rules/evaluate 'matches' is not a boolean.")
+        sys.exit(1)
+
+    if not matches:
+        print(
+            "❌ /data/rules/evaluate returned matches=False for a rule that "
+            "should match the provided enrichment."
+        )
+        sys.exit(1)
+
+    print("ℹ️ /data/rules/evaluate returned matches=True as expected.")
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
@@ -376,6 +421,9 @@ def main() -> None:
 
     # --- DATA API: PLAYLIST RULES (write & read) ---
     test_rules_write_and_read()
+
+    # --- DATA API: PLAYLIST RULES (evaluation) ---
+    test_rules_evaluation_endpoint()
 
     # --- ASYNC PIPELINE JOBS (legacy step=tracks) ---
     print("\n🚀 Testing legacy async job: step=tracks")

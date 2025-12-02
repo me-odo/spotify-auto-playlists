@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.core import Classification, PlaylistRuleSet, Track
+from app.core import Classification, PlaylistRuleSet, RuleGroup, Track
 from app.data import (
     ClassificationRepository,
     TracksRepository,
@@ -11,7 +11,7 @@ from app.data import (
     load_rules,
     save_rules,
 )
-from app.pipeline import load_external_features_cache
+from app.pipeline import load_external_features_cache, matches_rules
 
 router = APIRouter()
 
@@ -33,6 +33,11 @@ class TracksResponse(BaseModel):
 
 class UpdateClassificationRequest(BaseModel):
     labels: Dict[str, Any]
+
+
+class RuleEvaluationRequest(BaseModel):
+    rules: RuleGroup
+    enrichment: Dict[str, Any]
 
 
 DEFAULT_CLASSIFIER_ID = "mood_v1"
@@ -258,3 +263,16 @@ def upsert_rule(rule: PlaylistRuleSet) -> Dict[str, Any]:
 
     # Return the rule as a plain dict; this includes at least "id" and "name".
     return rule.dict()
+
+
+@router.post("/rules/evaluate")
+def evaluate_rules(body: RuleEvaluationRequest) -> Dict[str, bool]:
+    """
+    Evaluate a RuleGroup against a simple enrichment mapping.
+
+    The response is a JSON object:
+      { "matches": true | false }
+    """
+    result = matches_rules(body.enrichment, body.rules)
+    # Ensure a strict boolean for the 'matches' field.
+    return {"matches": bool(result)}
