@@ -395,6 +395,86 @@ def test_rules_validation_endpoint() -> None:
     print("ℹ️ /data/rules/validate returned valid=True as expected.")
 
 
+def test_rule_based_playlist_preview() -> None:
+    """Functional test for rule-based playlist preview API."""
+    print("\n=== POST /pipeline/playlists/preview-from-rules ===")
+
+    body = {
+        "rules": [
+            {
+                "id": "smoke_playlist_rule",
+                "name": "Smoke Test Playlist Rule",
+                "description": "Include tracks with mood = smoke_test_mood",
+                "enabled": True,
+                "target_playlist_id": None,
+                "rules": {
+                    "operator": "and",
+                    "conditions": [
+                        {
+                            "field": "mood",
+                            "operator": "eq",
+                            "value": "smoke_test_mood",
+                        }
+                    ],
+                },
+            }
+        ],
+        "tracks": [
+            {
+                "track_id": "track_1",
+                "enrichment": {"mood": "smoke_test_mood"},
+            },
+            {
+                "track_id": "track_2",
+                "enrichment": {"mood": "another_mood"},
+            },
+        ],
+    }
+
+    result = call("post", "/pipeline/playlists/preview-from-rules", json=body)
+
+    if not isinstance(result, dict):
+        print("❌ /pipeline/playlists/preview-from-rules did not return a JSON object.")
+        sys.exit(1)
+
+    playlists = result.get("playlists")
+    if not isinstance(playlists, list) or not playlists:
+        print("❌ preview-from-rules returned an invalid or empty 'playlists' list.")
+        sys.exit(1)
+
+    preview = playlists[0]
+    if not isinstance(preview, dict):
+        print("❌ playlist preview is not a JSON object.")
+        sys.exit(1)
+
+    rule_id = preview.get("rule_id")
+    track_ids = preview.get("track_ids")
+
+    if rule_id != "smoke_playlist_rule":
+        print(
+            "❌ playlist preview rule_id mismatch "
+            f"(expected='smoke_playlist_rule', got={rule_id!r})."
+        )
+        sys.exit(1)
+
+    if not isinstance(track_ids, list):
+        print("❌ playlist preview track_ids is not a list.")
+        sys.exit(1)
+
+    if "track_1" not in track_ids:
+        print("❌ track_1 is missing from the preview result.")
+        sys.exit(1)
+
+    if "track_2" in track_ids:
+        print("❌ track_2 should not be present in the preview result.")
+        sys.exit(1)
+
+    print(
+        "ℹ️ rule-based playlist preview correctly included track_1 and "
+        "excluded track_2."
+    )
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
@@ -499,6 +579,9 @@ def main() -> None:
 
     # --- DATA API: PLAYLIST RULES (validation) ---
     test_rules_validation_endpoint()
+
+    # --- DATA API: PLAYLIST RULES (playlist preview from rules) ---
+    test_rule_based_playlist_preview()
 
     # --- ASYNC PIPELINE JOBS (legacy step=tracks) ---
     print("\n🚀 Testing legacy async job: step=tracks")

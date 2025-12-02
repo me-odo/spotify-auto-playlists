@@ -1,8 +1,10 @@
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
+
+from app.core import PlaylistRuleSet
 
 
 class TracksResponse(BaseModel):
@@ -114,3 +116,24 @@ class PipelineJobResponse(BaseModel):
 
 class PipelineJobListResponse(BaseModel):
     jobs: List[PipelineJobResponse]
+
+
+class RuleBasedPreviewTrack(BaseModel):
+    track_id: str
+    enrichment: Dict[str, Any]
+
+
+class RuleBasedPlaylistPreview(BaseModel):
+    rule_id: str
+    rule_name: str
+    track_ids: List[str]
+    track_count: int
+
+
+class RuleBasedPlaylistPreviewResponse(BaseModel):
+    playlists: List[RuleBasedPlaylistPreview]
+
+
+class RuleBasedPreviewRequest(BaseModel):
+    rules: List[PlaylistRuleSet]
+    tracks: List[RuleBasedPreviewTrack]
