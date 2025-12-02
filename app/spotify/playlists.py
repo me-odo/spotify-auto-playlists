@@ -1,12 +1,12 @@
 from collections import Counter
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import requests
 
 from app.config import SPOTIFY_API_BASE
 from app.core import log_info
 
-from .auth import spotify_headers
+from .auth import get_current_user_id, spotify_headers
 
 
 def get_user_playlists(token_info: Dict) -> List[Dict]:
@@ -25,6 +25,40 @@ def get_user_playlists(token_info: Dict) -> List[Dict]:
 
     log_info(f"{len(playlists)} playlists found.")
     return playlists
+
+
+def list_user_playlists(token_info: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return a simplified view of the current user's playlists.
+
+    Each playlist dict contains:
+      - id: Spotify playlist id
+      - name: playlist name
+      - owner: display name or id of the owner
+      - tracks_total: number of tracks in the playlist
+      - is_owned: True if owned by the current user
+    """
+    current_user_id = get_current_user_id(token_info)
+    raw_playlists = get_user_playlists(token_info)
+
+    result: List[Dict[str, Any]] = []
+    for p in raw_playlists:
+        owner_info = p.get("owner") or {}
+        owner_display = owner_info.get("display_name") or owner_info.get("id") or ""
+        tracks_total = (p.get("tracks") or {}).get("total") or 0
+        is_owned = owner_info.get("id") == current_user_id
+
+        result.append(
+            {
+                "id": p.get("id"),
+                "name": p.get("name"),
+                "owner": owner_display,
+                "tracks_total": int(tracks_total),
+                "is_owned": bool(is_owned),
+            }
+        )
+
+    log_info(f"Prepared {len(result)} user playlists for API consumption.")
+    return result
 
 
 def find_or_create_playlist(
