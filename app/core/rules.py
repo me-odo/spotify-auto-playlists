@@ -13,6 +13,13 @@ class ConditionOperator(str, Enum):
     LTE = "lte"
     IN = "in"
     NOT_IN = "not_in"
+    BETWEEN = "between"
+    CONTAINS = "contains"
+    STARTS_WITH = "starts_with"
+    ENDS_WITH = "ends_with"
+    EXISTS = "exists"
+    NOT_EXISTS = "not_exists"
+    REGEX = "regex"
 
 
 class LogicalOperator(str, Enum):

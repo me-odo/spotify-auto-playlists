@@ -323,6 +323,78 @@ def test_rules_evaluation_endpoint() -> None:
     print("ℹ️ /data/rules/evaluate returned matches=True as expected.")
 
 
+def test_rules_validation() -> None:
+    """Minimal test for the rules validation endpoint."""
+    print("\n=== POST /data/rules/validate ===")
+
+    body = {
+        "rules": {
+            "operator": "and",
+            "conditions": [
+                {"field": "mood", "operator": "eq", "value": "happy"},
+            ],
+        }
+    }
+
+    result = call("post", "/data/rules/validate", json=body)
+
+    if not isinstance(result, dict):
+        print("❌ POST /data/rules/validate did not return a JSON object.")
+        sys.exit(1)
+
+    valid = result.get("valid")
+    if valid is not True:
+        print(
+            "❌ /data/rules/validate did not return valid=True for a simple "
+            "AND/EQ rule definition."
+        )
+        sys.exit(1)
+
+    print("ℹ️ /data/rules/validate returned valid=True as expected.")
+
+
+def test_rules_validation_endpoint() -> None:
+    """Functional test for the rule validation API."""
+    print("\n=== POST /data/rules/validate ===")
+
+    body = {
+        "rules": {
+            "operator": "and",
+            "conditions": [
+                {
+                    "field": "mood",
+                    "operator": "eq",
+                    "value": "happy",
+                }
+            ],
+        }
+    }
+
+    result = call("post", "/data/rules/validate", json=body)
+
+    if not isinstance(result, dict):
+        print("❌ POST /data/rules/validate did not return a JSON object.")
+        sys.exit(1)
+
+    if "valid" not in result:
+        print("❌ /data/rules/validate response is missing 'valid' key.")
+        sys.exit(1)
+
+    valid = result["valid"]
+    if not isinstance(valid, bool):
+        print("❌ /data/rules/validate 'valid' is not a boolean.")
+        sys.exit(1)
+
+    if not valid:
+        print(
+            "❌ /data/rules/validate returned valid=False for a simple, "
+            "well-formed rule that should be considered valid."
+        )
+        sys.exit(1)
+
+    print("ℹ️ /data/rules/validate returned valid=True as expected.")
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
@@ -424,6 +496,9 @@ def main() -> None:
 
     # --- DATA API: PLAYLIST RULES (evaluation) ---
     test_rules_evaluation_endpoint()
+
+    # --- DATA API: PLAYLIST RULES (validation) ---
+    test_rules_validation_endpoint()
 
     # --- ASYNC PIPELINE JOBS (legacy step=tracks) ---
     print("\n🚀 Testing legacy async job: step=tracks")
