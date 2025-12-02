@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List
 
 from app.core import (
@@ -67,6 +68,53 @@ def _evaluate_condition(enrichment: Dict[str, Any], condition: RuleCondition) ->
             return left not in value
         # Unsupported value type for membership tests
         return False
+
+    # BETWEEN
+    if op == ConditionOperator.BETWEEN:
+        # value must be a 2-element sequence [min, max] with numeric bounds
+        if (
+            isinstance(value, (list, tuple))
+            and len(value) == 2
+            and isinstance(left, (int, float))
+            and isinstance(value[0], (int, float))
+            and isinstance(value[1], (int, float))
+        ):
+            lower, upper = value
+            return lower <= left <= upper
+        return False
+
+    # String containment / prefixes / suffixes
+    if op == ConditionOperator.CONTAINS:
+        if isinstance(left, str) and isinstance(value, str):
+            return value in left
+        return False
+
+    if op == ConditionOperator.STARTS_WITH:
+        if isinstance(left, str) and isinstance(value, str):
+            return left.startswith(value)
+        return False
+
+    if op == ConditionOperator.ENDS_WITH:
+        if isinstance(left, str) and isinstance(value, str):
+            return left.endswith(value)
+        return False
+
+    # Existence checks
+    if op == ConditionOperator.EXISTS:
+        return left is not None
+
+    if op == ConditionOperator.NOT_EXISTS:
+        return left is None
+
+    # REGEX
+    if op == ConditionOperator.REGEX:
+        if not (isinstance(left, str) and isinstance(value, str)):
+            return False
+        try:
+            return bool(re.search(value, left))
+        except Exception:
+            # Invalid pattern or other regex error: treat as non-match.
+            return False
 
     # Fallback: unsupported operator
     return False

@@ -40,6 +40,10 @@ class RuleEvaluationRequest(BaseModel):
     enrichment: Dict[str, Any]
 
 
+class RuleValidationRequest(BaseModel):
+    rules: RuleGroup
+
+
 DEFAULT_CLASSIFIER_ID = "mood_v1"
 DEFAULT_FEATURE_PROVIDER_ID = "acousticbrainz"
 
@@ -276,3 +280,17 @@ def evaluate_rules(body: RuleEvaluationRequest) -> Dict[str, bool]:
     result = matches_rules(body.enrichment, body.rules)
     # Ensure a strict boolean for the 'matches' field.
     return {"matches": bool(result)}
+
+
+@router.post("/rules/validate")
+def validate_rules(body: RuleValidationRequest) -> Dict[str, bool]:
+    """
+    Validate a RuleGroup definition.
+
+    - Relies on Pydantic validation for structure.
+    - Performs a dry evaluation against an empty enrichment mapping.
+    - Returns { "valid": true } when validation succeeds.
+    """
+    # Dry run; any internal error here would indicate an invalid rule structure.
+    _ = matches_rules({}, body.rules)
+    return {"valid": True}
