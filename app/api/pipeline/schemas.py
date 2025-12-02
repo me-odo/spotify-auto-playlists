@@ -109,6 +109,7 @@ class PipelineJobResponse(BaseModel):
     progress: Optional[float] = None
     message: Optional[str] = None
     payload: Optional[dict] = None
+    metadata: Optional[dict] = None
 
 
 class PipelineJobListResponse(BaseModel):

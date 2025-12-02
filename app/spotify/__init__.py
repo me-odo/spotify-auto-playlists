@@ -23,6 +23,7 @@ from .playlists import (
     incremental_update_playlist,
     set_playlist_tracks,
 )
+from .sources import TrackSource, TrackSourceType
 from .tracks import get_all_liked_tracks
 
 __all__ = [
@@ -40,4 +41,6 @@ __all__ = [
     "get_playlist_tracks",
     "set_playlist_tracks",
     "incremental_update_playlist",
+    "TrackSource",
+    "TrackSourceType",
 ]

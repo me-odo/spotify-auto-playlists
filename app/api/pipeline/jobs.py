@@ -12,6 +12,7 @@ from app.data import (
     update_job,
 )
 from app.pipeline import run_step_for_job
+from app.spotify import TrackSource, TrackSourceType
 
 from .schemas import PipelineJobListResponse, PipelineJobResponse, PipelineJobStatus
 
@@ -31,6 +32,7 @@ def _job_to_response(job: DataPipelineJob) -> PipelineJobResponse:
         progress=job.progress,
         message=job.message,
         payload=job.payload,
+        metadata=job.metadata,
     )
 
 
@@ -69,7 +71,21 @@ def run_step_async(step: str, background_tasks: BackgroundTasks) -> PipelineJobR
             status_code=400, detail=f"Unsupported pipeline step: {step!r}"
         )
 
-    job = create_job(step=step)
+    metadata = None
+    if step == "tracks":
+        # For the tracks step, record the logical source of tracks in job metadata.
+        source = TrackSource(
+            source_type=TrackSourceType.LIKED,
+            source_id=None,
+            label="Liked tracks",
+        )
+        metadata = {
+            "source_type": source.source_type.value,
+            "source_id": source.source_id,
+            "source_label": source.label,
+        }
+
+    job = create_job(step=step, metadata=metadata)
     background_tasks.add_task(_run_job_background, job.id)
     return _job_to_response(job)
 
