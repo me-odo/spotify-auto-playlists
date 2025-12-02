@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Dict, List
 
 from app.core import Classification, log_info, log_step
@@ -258,7 +259,8 @@ def _run_fetch_tracks_step(metadata: Dict | None) -> Dict:
     )
 
     tracks = fetch_tracks_for_source(token_info, source)
-    serialized_tracks = [t.dict() for t in tracks]
+    # Track is a dataclass, so we serialize using dataclasses.asdict.
+    serialized_tracks = [asdict(t) for t in tracks]
 
     source_payload = {
         "source_type": source.source_type.value,

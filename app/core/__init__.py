@@ -16,7 +16,7 @@ from .logging_utils import (
     log_success,
     log_warning,
 )
-from .models import Classification, Track
+from .models import Classification, Track, TrackEnrichment
 
 __all__ = [
     "configure_logging",
@@ -33,4 +33,5 @@ __all__ = [
     "read_json",
     "Track",
     "Classification",
+    "TrackEnrichment",
 ]

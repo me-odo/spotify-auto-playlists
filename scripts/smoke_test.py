@@ -161,6 +161,34 @@ def test_multi_source_tracks_fetch() -> None:
     )
 
 
+def test_enrichments_endpoint() -> None:
+    """Basic non-regression test for the unified enrichments API."""
+    print("\n=== GET /data/enrichments ===")
+
+    enrichments = call("get", "/data/enrichments")
+
+    # The endpoint must return a JSON object (mapping track_id -> list of enrichments).
+    if not isinstance(enrichments, dict):
+        print("❌ /data/enrichments did not return a JSON object (dict).")
+        sys.exit(1)
+
+    # If there is at least one entry, validate that the value is a list.
+    items = list(enrichments.items())
+    if items:
+        sample_track_id, sample_entries = items[0]
+        if not isinstance(sample_entries, list):
+            print(
+                "❌ /data/enrichments value for track "
+                f"{sample_track_id!r} is not a list."
+            )
+            sys.exit(1)
+
+    print(
+        "ℹ️ /data/enrichments returned "
+        f"{len(enrichments)} tracks with enrichment entries."
+    )
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
@@ -250,6 +278,9 @@ def main() -> None:
             sys.exit(1)
     else:
         print("\n⏭  Skipping PATCH classification test (no track id available).")
+
+    # --- DATA API: ENRICHMENTS ---
+    test_enrichments_endpoint()
 
     # --- ASYNC PIPELINE JOBS (legacy step=tracks) ---
     print("\n🚀 Testing legacy async job: step=tracks")
