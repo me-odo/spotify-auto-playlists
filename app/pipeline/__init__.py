@@ -25,6 +25,7 @@ from .playlist_manager import (
     sync_playlists,
 )
 from .reporting import write_unmatched_report
+from .rules_engine import build_enrichment_view, matches_rules
 from .sources_manager import fetch_tracks_for_source
 
 __all__ = [
@@ -44,5 +45,7 @@ __all__ = [
     "save_tracks_cache",
     "write_unmatched_report",
     "run_step_for_job",
+    "build_enrichment_view",
+    "matches_rules",
     "fetch_tracks_for_source",
 ]
