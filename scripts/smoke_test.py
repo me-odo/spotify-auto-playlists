@@ -217,6 +217,67 @@ def test_rules_endpoint() -> None:
     print(f"ℹ️ /data/rules returned {len(rules)} rule definition(s).")
 
 
+def test_rules_write_and_read() -> None:
+    """Functional test for creating and reading playlist rules."""
+    print("\n=== POST /data/rules (create smoke_test rule) ===")
+
+    rule_id = "smoke_test_rule"
+    body = {
+        "id": rule_id,
+        "name": "Smoke Test Rule",
+        "description": "Rule created by scripts/smoke_test.py",
+        "enabled": True,
+        "target_playlist_id": None,
+        "rules": {
+            "operator": "and",
+            "conditions": [
+                {
+                    "field": "mood",
+                    "operator": "eq",
+                    "value": "smoke_test_mood",
+                }
+            ],
+        },
+    }
+
+    created = call("post", "/data/rules", json=body)
+
+    # The POST must return a JSON object with at least id and name.
+    if not isinstance(created, dict):
+        print("❌ POST /data/rules did not return a JSON object.")
+        sys.exit(1)
+
+    for key in ("id", "name"):
+        if key not in created:
+            print(f"❌ POST /data/rules response is missing key: {key!r}.")
+            sys.exit(1)
+
+    if created["id"] != rule_id:
+        print(
+            "❌ POST /data/rules returned a rule with unexpected id "
+            f"(expected={rule_id!r}, got={created['id']!r})."
+        )
+        sys.exit(1)
+
+    print("\n=== GET /data/rules (verify persistence) ===")
+    rules = call("get", "/data/rules")
+
+    if not isinstance(rules, list):
+        print("❌ /data/rules did not return a JSON list.")
+        sys.exit(1)
+
+    matching = [r for r in rules if isinstance(r, dict) and r.get("id") == rule_id]
+
+    if not matching:
+        print(
+            "❌ /data/rules does not contain the rule created by "
+            "POST /data/rules (id='smoke_test_rule')."
+        )
+        sys.exit(1)
+
+    print(f"ℹ️ /data/rules contains {len(matching)} rule(s) with id={rule_id!r}.")
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
@@ -312,6 +373,9 @@ def main() -> None:
 
     # --- DATA API: PLAYLIST RULES ---
     test_rules_endpoint()
+
+    # --- DATA API: PLAYLIST RULES (write & read) ---
+    test_rules_write_and_read()
 
     # --- ASYNC PIPELINE JOBS (legacy step=tracks) ---
     print("\n🚀 Testing legacy async job: step=tracks")
