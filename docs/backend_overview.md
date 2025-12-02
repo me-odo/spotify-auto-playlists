@@ -206,7 +206,7 @@ sequenceDiagram
 
 ---
 
-## 3. Testing – `scripts/smoke_test.py`
+## 3. Testing – `scripts/smoke_test.py` and pytest unit tests
 
 The smoke test is the **authoritative functional test**. It currently covers:
 
@@ -222,10 +222,15 @@ The smoke test is the **authoritative functional test**. It currently covers:
 - Rule-based playlist preview:
   - `POST /pipeline/playlists/preview-from-rules`.
 
+In addition to the smoke test, there is a **pytest-based unit test suite** under `tests/` that:
+- exercises core building blocks such as the rules engine, filesystem JSON helpers, enrichments/rules persistence, and rule-based playlist previews, and
+- remains **fully isolated** from real cache/report directories and external APIs by using `tmp_path`, `monkeypatch`, and in-memory data instead of hitting Spotify, MusicBrainz, AcousticBrainz, etc.
+
 When you add new behaviours, you should:
 
 1. Extend or adjust `scripts/smoke_test.py` so the expected behaviour is explicit.
-2. Make backend changes that keep the smoke test green.
+2. Add or update focused pytest unit tests under `tests/` that cover the new core behaviour.
+3. Make backend changes that keep both the smoke test and the unit test suite green.
 
 ---
 
