@@ -3,6 +3,8 @@ from typing import Dict, List
 from app.core import Classification, log_info, log_step
 from app.spotify import (
     SpotifyTokenMissing,
+    TrackSource,
+    TrackSourceType,
     get_all_liked_tracks,
     get_user_playlists,
     load_spotify_token,
@@ -17,8 +19,17 @@ from .cache_manager import (
 from .classifier import classify_tracks_rule_based
 from .external_features import enrich_tracks_with_external_features
 from .playlist_manager import build_target_playlists, preview_playlist_diffs
+from .sources_manager import fetch_tracks_for_source
 
-SUPPORTED_STEPS = {"tracks", "external", "classify", "build", "diff", "apply"}
+SUPPORTED_STEPS = {
+    "tracks",
+    "external",
+    "classify",
+    "build",
+    "diff",
+    "apply",
+    "fetch_tracks",
+}
 
 
 def _run_tracks_step() -> Dict:
@@ -207,7 +218,68 @@ def _run_apply_step() -> Dict:
     )
 
 
-def run_step_for_job(step: str) -> Dict:
+def _run_fetch_tracks_step(metadata: Dict | None) -> Dict:
+    """Run the fetch_tracks step for a specific logical source.
+
+    The job metadata is expected to contain:
+      - source_type: "liked" or "playlist"
+      - source_id: optional playlist id (for playlists)
+      - source_label: human-readable label
+    """
+    try:
+        token_info = load_spotify_token()
+    except SpotifyTokenMissing as e:
+        # Let the caller handle authentication errors (HTTP 401, etc.).
+        raise e
+
+    if metadata is None:
+        raise RuntimeError("fetch_tracks step requires job metadata.")
+
+    source_type_str = metadata.get("source_type")
+    if not source_type_str:
+        raise RuntimeError("fetch_tracks job metadata missing 'source_type'.")
+
+    try:
+        source_type = TrackSourceType(source_type_str)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Unsupported source_type for fetch_tracks job: {source_type_str!r}"
+        ) from exc
+
+    source = TrackSource(
+        source_type=source_type,
+        source_id=metadata.get("source_id"),
+        label=metadata.get("source_label"),
+    )
+
+    log_step(
+        f"Fetch tracks job for source_type={source.source_type.value}, "
+        f"source_id={source.source_id!r}, label={source.label!r}..."
+    )
+
+    tracks = fetch_tracks_for_source(token_info, source)
+    serialized_tracks = [t.dict() for t in tracks]
+
+    source_payload = {
+        "source_type": source.source_type.value,
+        "source_id": source.source_id,
+        "source_label": source.label,
+    }
+
+    log_info(
+        "Fetch tracks job: "
+        f"{len(serialized_tracks)} tracks for source_type={source.source_type.value}."
+    )
+
+    return {
+        "step": "fetch_tracks",
+        "status": "done",
+        "source": source_payload,
+        "tracks": serialized_tracks,
+    }
+
+
+def run_step_for_job(step: str, metadata: Dict | None = None) -> Dict:
     """
     Execute the given pipeline step synchronously and return a lightweight payload.
 
@@ -218,9 +290,11 @@ def run_step_for_job(step: str) -> Dict:
       - build
       - diff
       - apply (currently raises a clear error)
+      - fetch_tracks (uses job metadata to describe the source)
 
     The returned dict is intended to be stored on a PipelineJob payload field
-    so that the frontend can inspect basic job results (counts, simple stats).
+    so that the frontend can inspect basic job results (counts, simple stats
+    or, for fetch_tracks, a list of serialized Track objects).
     """
     if step not in SUPPORTED_STEPS:
         raise ValueError(f"Unsupported pipeline step: {step!r}")
@@ -237,6 +311,8 @@ def run_step_for_job(step: str) -> Dict:
         return _run_diff_step()
     if step == "apply":
         return _run_apply_step()
+    if step == "fetch_tracks":
+        return _run_fetch_tracks_step(metadata)
 
     # This line should not be reachable due to the SUPPORTED_STEPS guard.
     raise ValueError(f"Unsupported pipeline step: {step!r}")

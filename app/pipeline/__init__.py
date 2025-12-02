@@ -25,6 +25,7 @@ from .playlist_manager import (
     sync_playlists,
 )
 from .reporting import write_unmatched_report
+from .sources_manager import fetch_tracks_for_source
 
 __all__ = [
     "PipelineOptions",
@@ -43,4 +44,5 @@ __all__ = [
     "save_tracks_cache",
     "write_unmatched_report",
     "run_step_for_job",
+    "fetch_tracks_for_source",
 ]

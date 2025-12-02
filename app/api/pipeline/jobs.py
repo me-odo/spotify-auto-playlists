@@ -18,7 +18,15 @@ from .schemas import PipelineJobListResponse, PipelineJobResponse, PipelineJobSt
 
 router = APIRouter()
 
-_VALID_STEPS = {"tracks", "external", "classify", "build", "diff", "apply"}
+_VALID_STEPS = {
+    "tracks",
+    "external",
+    "classify",
+    "build",
+    "diff",
+    "apply",
+    "fetch_tracks",
+}
 
 
 def _job_to_response(job: DataPipelineJob) -> PipelineJobResponse:
@@ -48,7 +56,7 @@ def _run_job_background(job_id: str) -> None:
     update_job(job)
 
     try:
-        payload = run_step_for_job(job.step)
+        payload = run_step_for_job(job.step, job.metadata)
         job.payload = payload
         job.progress = 1.0
         job.status = DataPipelineJobStatus.DONE

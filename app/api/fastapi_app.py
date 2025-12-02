@@ -7,6 +7,7 @@ from app.api.pipeline.diff import router as pipeline_diff_router
 from app.api.pipeline.external import router as pipeline_external_router
 from app.api.pipeline.health import router as pipeline_health_router
 from app.api.pipeline.jobs import router as jobs_router
+from app.api.pipeline.multi_sources import router as pipeline_multi_sources_router
 from app.api.pipeline.playlists import router as pipeline_playlists_router
 from app.api.pipeline.tracks import router as pipeline_tracks_router
 from app.api.spotify.playlists import router as spotify_playlists_router
@@ -27,6 +28,7 @@ app.include_router(pipeline_external_router, prefix="/pipeline", tags=["pipeline
 app.include_router(pipeline_classify_router, prefix="/pipeline", tags=["pipeline"])
 app.include_router(pipeline_playlists_router, prefix="/pipeline", tags=["pipeline"])
 app.include_router(pipeline_diff_router, prefix="/pipeline", tags=["pipeline"])
+app.include_router(pipeline_multi_sources_router, prefix="/pipeline", tags=["pipeline"])
 app.include_router(jobs_router, prefix="/pipeline", tags=["pipeline-jobs"])
 
 # Data routes
