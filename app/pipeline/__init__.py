@@ -20,6 +20,7 @@ from .jobs_runner import run_step_for_job
 from .orchestration import PipelineOptions, run_pipeline, run_pipeline_entrypoint
 from .playlist_manager import (
     apply_target_playlists,
+    build_rule_based_playlists,
     build_target_playlists,
     preview_playlist_diffs,
     sync_playlists,
@@ -36,6 +37,7 @@ __all__ = [
     "sync_playlists",
     "preview_playlist_diffs",
     "apply_target_playlists",
+    "build_rule_based_playlists",
     "classify_tracks_rule_based",
     "enrich_tracks_with_external_features",
     "load_classification_cache",

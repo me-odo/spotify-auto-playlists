@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Tuple
 from app.config import DIFF_DIR, PLAYLIST_PREFIX_MOOD
 from app.core import (
     Classification,
+    PlaylistRuleSet,
     Track,
     ensure_dir,
     log_info,
@@ -34,6 +35,8 @@ from app.spotify import (
     get_playlist_tracks,
     incremental_update_playlist,
 )
+
+from .rules_engine import matches_rules
 
 
 def build_target_playlists(
@@ -440,3 +443,54 @@ def apply_target_playlists(
 
     log_success(f"Applied {len(results)} target playlists to Spotify.")
     return results
+
+
+def build_rule_based_playlists(
+    rules: List[PlaylistRuleSet],
+    tracks: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Build in-memory playlist previews from a set of playlist rules and tracks.
+
+    Each track input is expected to be a mapping of the form:
+        {"track_id": str, "enrichment": Dict[str, Any]}
+
+    For each PlaylistRuleSet in `rules`, this function:
+      - evaluates its `rules` against the provided enrichment mapping
+        using matches_rules()
+      - collects track_ids that satisfy the rule group into a dedicated bucket
+
+    The returned objects are plain dictionaries that can be easily converted
+    into API models.
+    """
+    playlists: List[Dict[str, Any]] = []
+
+    if not rules:
+        return playlists
+
+    for rule_set in rules:
+        track_ids: List[str] = []
+
+        for track in tracks or []:
+            track_id = track.get("track_id")
+            if not track_id:
+                continue
+
+            enrichment = track.get("enrichment") or {}
+            if not isinstance(enrichment, dict):
+                continue
+
+            if matches_rules(enrichment, rule_set.rules):
+                track_ids.append(track_id)
+
+        playlists.append(
+            {
+                "rule_id": rule_set.id,
+                "rule_name": rule_set.name,
+                "track_ids": track_ids,
+                "track_count": len(track_ids),
+            }
+        )
+
+    return playlists
+    return playlists
