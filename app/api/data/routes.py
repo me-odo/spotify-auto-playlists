@@ -4,7 +4,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.core import Classification, Track
-from app.data import ClassificationRepository, TracksRepository, load_enrichments_cache
+from app.data import (
+    ClassificationRepository,
+    TracksRepository,
+    load_enrichments_cache,
+    load_rules,
+)
 from app.pipeline import load_external_features_cache
 
 router = APIRouter()
@@ -191,5 +196,35 @@ def get_enrichments() -> Dict[str, List[Dict[str, Any]]]:
                     items.append(dict(entry))
         if items:
             result[str(track_id)] = items
+
+    return result
+
+
+@router.get("/rules")
+def get_rules() -> List[Dict[str, Any]]:
+    """
+    Return stored playlist rules as a JSON list.
+
+    The response is a list of PlaylistRuleSet-like dicts. Each object contains
+    at least 'id' and 'name' fields. It is acceptable to return an empty list
+    when no rules are defined.
+    """
+    rules = load_rules() or []
+
+    result: List[Dict[str, Any]] = []
+    for rule in rules:
+        if hasattr(rule, "dict"):
+            data = rule.dict()
+        elif isinstance(rule, dict):
+            data = dict(rule)
+        else:
+            continue
+
+        # Ensure id and name are always present for frontend / smoke tests.
+        if "id" in data and "name" in data:
+            result.append(data)
+        else:
+            # Skip malformed entries without required keys.
+            continue
 
     return result

@@ -24,6 +24,7 @@ from .jobs import (
     update_job,
 )
 from .repositories import ClassificationRepository, TracksRepository
+from .rules import load_rules, save_rules
 
 __all__ = [
     "load_tracks_cache",
@@ -34,6 +35,8 @@ __all__ = [
     "save_classification_cache",
     "load_enrichments_cache",
     "save_enrichments_cache",
+    "load_rules",
+    "save_rules",
     "PipelineJob",
     "PipelineJobStatus",
     "create_job",

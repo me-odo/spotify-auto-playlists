@@ -17,6 +17,13 @@ from .logging_utils import (
     log_warning,
 )
 from .models import Classification, Track, TrackEnrichment
+from .rules import (
+    ConditionOperator,
+    LogicalOperator,
+    PlaylistRuleSet,
+    RuleCondition,
+    RuleGroup,
+)
 
 __all__ = [
     "configure_logging",
@@ -34,4 +41,9 @@ __all__ = [
     "Track",
     "Classification",
     "TrackEnrichment",
+    "ConditionOperator",
+    "LogicalOperator",
+    "RuleCondition",
+    "RuleGroup",
+    "PlaylistRuleSet",
 ]
