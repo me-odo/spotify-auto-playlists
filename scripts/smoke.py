@@ -225,7 +225,7 @@ def test_rules_write_and_read() -> None:
     body = {
         "id": rule_id,
         "name": "Smoke Test Rule",
-        "description": "Rule created by scripts/smoke_test.py",
+        "description": "Rule created by scripts/smoke.py",
         "enabled": True,
         "target_playlist_id": None,
         "rules": {

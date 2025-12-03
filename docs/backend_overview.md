@@ -16,7 +16,7 @@ app/
   pipeline/     # business logic and orchestration
   spotify/      # Spotify Web API integration
 scripts/
-  smoke_test.py # end-to-end functional test
+  smoke.py # end-to-end functional test
 ```
 
 ### 1.1 API Layer (`app.api`)
@@ -206,7 +206,7 @@ sequenceDiagram
 
 ---
 
-## 3. Testing – `scripts/smoke_test.py` and pytest unit tests
+## 3. Testing – `scripts/smoke.py` and pytest unit tests
 
 The smoke test is the **authoritative functional test**. It currently covers:
 
@@ -228,7 +228,7 @@ In addition to the smoke test, there is a **pytest-based unit test suite** under
 
 When you add new behaviours, you should:
 
-1. Extend or adjust `scripts/smoke_test.py` so the expected behaviour is explicit.
+1. Extend or adjust `scripts/smoke.py` so the expected behaviour is explicit.
 2. Add or update focused pytest unit tests under `tests/` that cover the new core behaviour.
 3. Make backend changes that keep both the smoke test and the unit test suite green.
 

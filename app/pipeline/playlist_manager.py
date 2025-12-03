@@ -456,6 +456,7 @@ def build_rule_based_playlists(
         {"track_id": str, "enrichment": Dict[str, Any]}
 
     For each PlaylistRuleSet in `rules`, this function:
+      - ignores rules where `enabled` is False
       - evaluates its `rules` against the provided enrichment mapping
         using matches_rules()
       - collects track_ids that satisfy the rule group into a dedicated bucket
@@ -469,6 +470,10 @@ def build_rule_based_playlists(
         return playlists
 
     for rule_set in rules:
+        # Disabled rules are ignored and do not produce any playlist entry.
+        if hasattr(rule_set, "enabled") and rule_set.enabled is False:
+            continue
+
         track_ids: List[str] = []
 
         for track in tracks or []:
@@ -492,5 +497,4 @@ def build_rule_based_playlists(
             }
         )
 
-    return playlists
     return playlists

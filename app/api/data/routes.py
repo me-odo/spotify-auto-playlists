@@ -199,8 +199,10 @@ def get_enrichments() -> Dict[str, List[Dict[str, Any]]]:
         items: List[Dict[str, Any]] = []
         if isinstance(entries, list):
             for entry in entries:
-                if hasattr(entry, "dict"):
-                    # TrackEnrichment (or similar Pydantic model)
+                # Prefer Pydantic v2 model_dump when available
+                if hasattr(entry, "model_dump"):
+                    items.append(entry.model_dump(mode="json"))
+                elif hasattr(entry, "dict"):
                     items.append(entry.dict())
                 elif isinstance(entry, dict):
                     items.append(dict(entry))
@@ -223,7 +225,9 @@ def get_rules() -> List[Dict[str, Any]]:
 
     result: List[Dict[str, Any]] = []
     for rule in rules:
-        if hasattr(rule, "dict"):
+        if hasattr(rule, "model_dump"):
+            data = rule.model_dump(mode="json")
+        elif hasattr(rule, "dict"):
             data = rule.dict()
         elif isinstance(rule, dict):
             data = dict(rule)
@@ -266,7 +270,14 @@ def upsert_rule(rule: PlaylistRuleSet) -> Dict[str, Any]:
     save_rules(updated_rules)
 
     # Return the rule as a plain dict; this includes at least "id" and "name".
-    return rule.dict()
+    if hasattr(rule, "model_dump"):
+        return rule.model_dump(mode="json")
+    if hasattr(rule, "dict"):
+        return rule.dict()
+    if isinstance(rule, dict):
+        return dict(rule)
+    # Fallback; very unlikely here but keeps type checkers happy.
+    return {"id": getattr(rule, "id", None), "name": getattr(rule, "name", None)}
 
 
 @router.post("/rules/evaluate")

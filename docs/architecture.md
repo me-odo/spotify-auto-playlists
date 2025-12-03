@@ -78,7 +78,7 @@ The project is intentionally modular:
     - applying playlist changes (diff/apply pipeline).
   - `TrackSource` / `TrackSourceType` abstraction for describing sources.
 
-- **Scripts** (`scripts/smoke_test.py`)
+- **Scripts** (`scripts/smoke.py`)
   - Full end-to-end functional smoke test.
   - Treat this as the main **non-regression contract** of the system.
 
