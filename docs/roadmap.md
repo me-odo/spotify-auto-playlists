@@ -39,7 +39,7 @@ As of now, the backend provides:
   - `POST /pipeline/playlists/preview-from-rules` endpoint.
 
 - **End-to-end smoke test**
-  - `scripts/smoke_test.py` exercises:
+  - `scripts/smoke.py` exercises:
     - pipeline health,
     - core pipeline steps,
     - async jobs (legacy + `fetch_tracks`),

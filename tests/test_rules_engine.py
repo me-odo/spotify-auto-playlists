@@ -83,3 +83,131 @@ def test_matches_rules_regex_invalid_pattern_returns_false():
     )
 
     assert matches_rules(enrichment, rules) is False
+
+
+def test_matches_rules_in_and_not_in() -> None:
+    enrichment = {"mood": "chill"}
+
+    rules_in = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="mood",
+                operator=ConditionOperator.IN,
+                value=["chill", "happy"],
+            )
+        ],
+    )
+    assert matches_rules(enrichment, rules_in) is True
+
+    rules_not_in = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="mood",
+                operator=ConditionOperator.NOT_IN,
+                value=["sad", "angry"],
+            )
+        ],
+    )
+    assert matches_rules(enrichment, rules_not_in) is True
+
+    # Negative case: mood in excluded set
+    rules_not_in_fail = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="mood",
+                operator=ConditionOperator.NOT_IN,
+                value=["chill", "sad"],
+            )
+        ],
+    )
+    assert matches_rules(enrichment, rules_not_in_fail) is False
+
+
+def test_matches_rules_between_inclusive_bounds() -> None:
+    enrichment = {"tempo": 120}
+
+    rules = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="tempo",
+                operator=ConditionOperator.BETWEEN,
+                value=[100, 130],
+            )
+        ],
+    )
+
+    assert matches_rules(enrichment, rules) is True
+
+    rules_outside = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="tempo",
+                operator=ConditionOperator.BETWEEN,
+                value=[121, 130],
+            )
+        ],
+    )
+
+    assert matches_rules(enrichment, rules_outside) is False
+
+
+def test_matches_rules_string_contains_starts_ends() -> None:
+    enrichment = {"title": "My Happy Song"}
+
+    rules = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="title",
+                operator=ConditionOperator.CONTAINS,
+                value="Happy",
+            ),
+            RuleCondition(
+                field="title",
+                operator=ConditionOperator.STARTS_WITH,
+                value="My",
+            ),
+            RuleCondition(
+                field="title",
+                operator=ConditionOperator.ENDS_WITH,
+                value="Song",
+            ),
+        ],
+    )
+
+    assert matches_rules(enrichment, rules) is True
+
+
+def test_matches_rules_exists_and_not_exists() -> None:
+    enrichment = {
+        "present": 1,
+        "none_value": None,
+    }
+
+    rules = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="present",
+                operator=ConditionOperator.EXISTS,
+                value=True,
+            ),
+            RuleCondition(
+                field="missing",
+                operator=ConditionOperator.NOT_EXISTS,
+                value=True,
+            ),
+            RuleCondition(
+                field="none_value",
+                operator=ConditionOperator.NOT_EXISTS,
+                value=True,
+            ),
+        ],
+    )
+
+    assert matches_rules(enrichment, rules) is True
