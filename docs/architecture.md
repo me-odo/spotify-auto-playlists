@@ -34,11 +34,28 @@ flowchart LR
   D --> E[Rules engine<br/>PlaylistRuleSet]
   E --> F[Playlist previews]
   F --> G[Spotify playlist sync]
+
+%% External enrichment is optional: The enrichment step (external, LLM, manual) is not required for the core pipeline to function. The backend and smoke test do not depend on any enrichment provider being present; enrichment is additive and optional.
 ```
 
 ---
 
 ## 2. High-Level Components
+
+### Legacy Pipeline (v1) and Rules-based Pipeline (v2) Coexistence
+
+Both the legacy pipeline (v1) and the new rules-based pipeline (v2) are present in the backend:
+
+- **Why both exist**: v1 provides the original synchronous and job-based flows, while v2 introduces a rules-based, multi-source, and job-per-source approach.
+- **Roles**: v1 is relied on by the smoke test and for legacy compatibility; v2 is the intended target for the frontend and new features.
+- **UI usage**: The frontend will use the rules-based pipeline (v2).
+- **Smoke test**: The smoke test exercises both v1 and the v2 `fetch_tracks` step.
+
+### Dual Job System
+
+- `/pipeline/{step}/run-async`: legacy generic job runner (v1).
+- `/pipeline/tracks/fetch-sources`: v2 job generator, returns multiple jobs (one per source).
+- Both systems coexist intentionally and may converge in the future.
 
 The project is intentionally modular:
 
@@ -180,6 +197,7 @@ The current architecture is already prepared for future extensions:
     via `save_enrichments_cache()`.
   - The rules engine only depends on the flattened enrichment view, so
     it works transparently with new providers.
+  - **TrackEnrichment[] is internal storage**: The backend stores enrichments as a list of `TrackEnrichment` entries per track. The rule engine operates on a flattened dictionary view of these enrichments. The frontend can provide its own flattening logic and is not required to use the backend's `TrackEnrichment` model.
 
 - **Rules engine**
   - The DSL is defined centrally in `app.core.rules` and implemented in
