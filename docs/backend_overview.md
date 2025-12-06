@@ -175,6 +175,8 @@ sequenceDiagram
 
 ### 2.2 Enrichment & Unified Enrichments
 
+- **External enrichment is optional**: The external enrichment step (e.g. MusicBrainz / AcousticBrainz) is not required for the core pipeline to function. The backend and smoke test do not depend on any external enrichment provider being present; enrichment is additive and optional.
+
 - `external_features` step:
   - uses MusicBrainz / AcousticBrainz to enrich tracks.
   - writes provider-specific cache.
@@ -192,14 +194,17 @@ sequenceDiagram
     - `track_id -> [TrackEnrichment-like dicts]`.
   - The rules engine does not care about provider internals; it only sees
     `categories` merged via `build_enrichment_view`.
+  - **TrackEnrichment[] is internal storage**: The backend stores enrichments as a list of `TrackEnrichment` entries per track. The rule engine operates on a flattened dictionary view of these enrichments. The frontend can provide its own flattening logic and is not required to use the backend's `TrackEnrichment` model.
 
 ### 2.3 Rules & Playlist Preview
 
 - Rules are stored via `load_rules` / `save_rules` and exposed over:
   - `GET /data/rules`
-  - `POST /data/rules` (upsert)
+  - `POST /data/rules` (**upsert**: POST always creates or updates a rule set)
   - `POST /data/rules/evaluate`
   - `POST /data/rules/validate`
+
+- **POST /data/rules is an upsert**: The backend always creates or updates a rule set when receiving a POST. The frontend can safely use POST for both save and update operations.
 
 - Rule-based playlist preview:
   - API: `POST /pipeline/playlists/preview-from-rules`.
@@ -227,6 +232,13 @@ The smoke test is the **authoritative functional test**. It currently covers:
   - the new `step="fetch_tracks"` with multi-source aggregation.
 - Rule-based playlist preview:
   - `POST /pipeline/playlists/preview-from-rules`.
+
+- **Legacy and rules-based pipelines coexist**: The backend supports both the legacy pipeline (v1) and the new rules-based pipeline (v2). The UI will use the rules-based pipeline (v2), while the smoke test exercises both the legacy pipeline (v1) and the new `fetch_tracks` step from v2.
+
+- **Dual job system**: There are two job systems:
+  - `/pipeline/{step}/run-async` is the legacy generic job runner.
+  - `/pipeline/tracks/fetch-sources` is the v2 job generator, returning multiple jobs (one per source).
+  Both systems coexist intentionally and may converge in the future.
 
 In addition to the smoke test, there is a **pytest-based unit test suite** under `tests/` that:
 - exercises core building blocks such as the rules engine, filesystem JSON helpers, enrichments/rules persistence, and rule-based playlist previews, and

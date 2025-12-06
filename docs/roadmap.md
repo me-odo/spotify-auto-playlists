@@ -17,6 +17,32 @@ As of now, the backend provides:
   - Async jobs for `fetch_tracks` (one per source).
   - Aggregation endpoint `/pipeline/tracks/aggregate`.
 
+- **Legacy pipeline (v1) and rules-based pipeline (v2) coexist**
+  - Both pipelines are present in the backend.
+  - The UI will use the rules-based pipeline (v2).
+  - The smoke test exercises both the legacy pipeline (v1) and the v2 `fetch_tracks` step.
+
+- **Dual job system**
+  - `/pipeline/{step}/run-async`: legacy generic job runner (v1).
+  - `/pipeline/tracks/fetch-sources`: v2 job generator, returns multiple jobs (one per source).
+  - Both systems coexist intentionally and may converge in the future.
+
+- **External enrichment is optional**
+  - The external enrichment step is not required for the core pipeline or for the smoke test to pass. Enrichment is additive and optional.
+
+- **TrackEnrichment[] is internal storage**
+  - The backend stores enrichments as a list of `TrackEnrichment` entries per track.
+  - The rule engine operates on a flattened dictionary view of these enrichments.
+  - The frontend can provide its own flattening logic and is not required to use the backend's `TrackEnrichment` model.
+
+- **POST /data/rules is an upsert**
+  - The backend always creates or updates a rule set when receiving a POST.
+  - The frontend can safely use POST for both save and update operations.
+
+- **/spotify/playlists is important for frontend but not covered by smoke.py**
+  - The `/spotify/playlists` endpoint is important for the frontend to display and select playlists, but is not covered by the backend smoke test.
+  - The API contract for this endpoint must eventually be tested end-to-end to ensure frontend-backend compatibility.
+
 - **Unified enrichment cache**
   - `TrackEnrichment` model.
   - `enrichments.json` storage with atomic JSON writes.

@@ -50,6 +50,8 @@ Backend endpoints:
 
 - `GET /spotify/playlists` – used to verify token and show a first list of playlists.
 
+> **Note:** The `/spotify/playlists` endpoint is important for the frontend to display and select playlists, but is not covered by the backend smoke test. The API contract for this endpoint must eventually be tested end-to-end to ensure frontend-backend compatibility.
+
 ---
 
 ### 2.2 Source Selection & Fetch Progress
@@ -106,6 +108,7 @@ Data inputs:
 - `GET /data/enrichments`
   - provides a mapping `track_id -> enrichments[]`.
   - frontend flattens or summarises this into per-track indicators.
+  - **TrackEnrichment[] is internal storage**: The backend stores enrichments as a list of `TrackEnrichment` entries per track. The rule engine operates on a flattened dictionary view of these enrichments. The frontend can provide its own flattening logic and is not required to use the backend's `TrackEnrichment` model.
 
 Table columns (minimal):
 
@@ -178,6 +181,7 @@ Backend interactions:
 
 - `GET /data/rules` – load rule sets.
 - `POST /data/rules` – upsert rule sets.
+  - **POST is always an upsert**: The backend always creates or updates a rule set when receiving a POST. The frontend can safely use POST for both save and update operations.
 - `POST /data/rules/validate` – validate rule structure before saving.
 - `POST /data/rules/evaluate` – test rules against sample enrichments from
   `/data/enrichments`.
