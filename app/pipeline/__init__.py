@@ -25,6 +25,12 @@ from .playlist_manager import (
     preview_playlist_diffs,
     sync_playlists,
 )
+from .providers import (
+    FEATURE_PROVIDERS,
+    FeatureProvider,
+    get_feature_provider,
+    list_feature_providers,
+)
 from .reporting import write_unmatched_report
 from .rules_engine import build_enrichment_view, matches_rules
 from .sources_manager import fetch_tracks_for_source
@@ -50,4 +56,8 @@ __all__ = [
     "build_enrichment_view",
     "matches_rules",
     "fetch_tracks_for_source",
+    "FeatureProvider",
+    "FEATURE_PROVIDERS",
+    "get_feature_provider",
+    "list_feature_providers",
 ]

@@ -181,6 +181,12 @@ sequenceDiagram
   - calls `_update_enrichment_cache_from_external` to append `TrackEnrichment`
     entries into `enrichments.json`.
 
+- Feature provider registry:
+  - `app.pipeline.providers` defines a small abstraction for feature providers.
+  - `FEATURE_PROVIDERS` exposes the registered providers (e.g. the AcousticBrainz-backed provider).
+  - `get_feature_provider(id)` returns a concrete provider instance by id.
+  - `list_feature_providers()` returns a lightweight list of `{id, type, version}` metadata suitable for introspection.
+
 - Unified enrichment view:
   - `/data/enrichments` exposes a simple mapping:
     - `track_id -> [TrackEnrichment-like dicts]`.
