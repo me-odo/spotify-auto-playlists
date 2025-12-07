@@ -475,11 +475,123 @@ def test_rule_based_playlist_preview() -> None:
     )
 
 
+def test_spotify_playlists_endpoint(auth_status: Dict[str, Any]) -> None:
+    """Optional test for the /spotify/playlists endpoint when authenticated."""
+    print("\n=== GET /spotify/playlists (conditional) ===")
+
+    is_authenticated = bool(auth_status.get("authenticated"))
+    if not is_authenticated:
+        print("⏭  Skipping /spotify/playlists test (not authenticated).")
+        return
+
+    playlists = call("get", "/spotify/playlists")
+
+    if not isinstance(playlists, list):
+        print("❌ /spotify/playlists did not return a JSON list.")
+        sys.exit(1)
+
+    if not playlists:
+        print("ℹ️ /spotify/playlists returned an empty list.")
+        return
+
+    sample = playlists[0]
+    if not isinstance(sample, dict):
+        print("❌ /spotify/playlists first item is not a JSON object.")
+        sys.exit(1)
+
+    required_keys = {"id", "name"}
+    missing = [key for key in required_keys if key not in sample]
+    if missing:
+        print(
+            "❌ /spotify/playlists items are missing required keys: "
+            f"{', '.join(sorted(missing))}."
+        )
+        sys.exit(1)
+
+    print(
+        f"ℹ️ /spotify/playlists returned {len(playlists)} playlist(s); "
+        f"sample id={sample.get('id')!r}."
+    )
+
+
+def test_rules_evaluation_complex_operators() -> None:
+    """Extended test for rule evaluation with OR/CONTAINS/BETWEEN operators."""
+    print("\n=== POST /data/rules/evaluate (complex operators) ===")
+
+    # OR + CONTAINS: should match via genre
+    body_or_contains = {
+        "rules": {
+            "operator": "or",
+            "conditions": [
+                {"field": "mood", "operator": "eq", "value": "happy"},
+                {"field": "genre", "operator": "contains", "value": "rock"},
+            ],
+        },
+        "enrichment": {
+            "mood": "neutral",
+            "genre": "indie rock",
+        },
+    }
+
+    result_or_contains = call("post", "/data/rules/evaluate", json=body_or_contains)
+
+    if not isinstance(result_or_contains, dict):
+        print(
+            "❌ /data/rules/evaluate (complex) did not return a JSON object "
+            "for OR/CONTAINS."
+        )
+        sys.exit(1)
+
+    matches_or_contains = result_or_contains.get("matches")
+    if matches_or_contains is not True:
+        print(
+            "❌ /data/rules/evaluate (complex) did not return matches=True "
+            "for an OR/CONTAINS rule that should match."
+        )
+        sys.exit(1)
+
+    # BETWEEN: numeric range
+    body_between = {
+        "rules": {
+            "operator": "and",
+            "conditions": [
+                {
+                    "field": "energy",
+                    "operator": "between",
+                    "value": [0.4, 0.8],
+                }
+            ],
+        },
+        "enrichment": {"energy": 0.5},
+    }
+
+    result_between = call("post", "/data/rules/evaluate", json=body_between)
+
+    if not isinstance(result_between, dict):
+        print("❌ /data/rules/evaluate (between) did not return a JSON object.")
+        sys.exit(1)
+
+    matches_between = result_between.get("matches")
+    if matches_between is not True:
+        print(
+            "❌ /data/rules/evaluate (between) did not return matches=True "
+            "for a value inside the expected range."
+        )
+        sys.exit(1)
+
+    print(
+        "ℹ️ /data/rules/evaluate correctly handled OR, CONTAINS and BETWEEN operators."
+    )
+
+
 def main() -> None:
     print("📀 Smoke Test: spotify-auto-playlists backend\n")
 
     # --- AUTH ---
-    call("get", "/auth/status")
+    auth_status = call("get", "/auth/status")
+
+    # --- SPOTIFY PLAYLISTS (conditional) ---
+    test_spotify_playlists_endpoint(auth_status)
 
     # --- PIPELINE STEPS (synchronous) ---
     call("get", "/pipeline/health")
@@ -576,6 +688,8 @@ def main() -> None:
 
     # --- DATA API: PLAYLIST RULES (evaluation) ---
     test_rules_evaluation_endpoint()
+
+    test_rules_evaluation_complex_operators()
 
     # --- DATA API: PLAYLIST RULES (validation) ---
     test_rules_validation_endpoint()

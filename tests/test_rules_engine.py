@@ -156,6 +156,44 @@ def test_matches_rules_between_inclusive_bounds() -> None:
     assert matches_rules(enrichment, rules_outside) is False
 
 
+def test_matches_rules_or_contains():
+    # Case A – OR + CONTAINS
+    rules = RuleGroup(
+        operator=LogicalOperator.OR,
+        conditions=[
+            RuleCondition(
+                field="mood",
+                operator=ConditionOperator.EQ,
+                value="happy",
+            ),
+            RuleCondition(
+                field="genre",
+                operator=ConditionOperator.CONTAINS,
+                value="rock",
+            ),
+        ],
+    )
+    enrichment = {"mood": "neutral", "genre": "indie rock"}
+    assert matches_rules(enrichment, rules) is True
+
+
+def test_matches_rules_between_numeric_range():
+    # Case B – BETWEEN
+    rules = RuleGroup(
+        operator=LogicalOperator.AND,
+        conditions=[
+            RuleCondition(
+                field="energy",
+                operator=ConditionOperator.BETWEEN,
+                value=[0.4, 0.8],
+            ),
+        ],
+    )
+    assert matches_rules({"energy": 0.5}, rules) is True
+    assert matches_rules({"energy": 0.2}, rules) is False
+    assert matches_rules({"energy": 0.9}, rules) is False
+
+
 def test_matches_rules_string_contains_starts_ends() -> None:
     enrichment = {"title": "My Happy Song"}
 
